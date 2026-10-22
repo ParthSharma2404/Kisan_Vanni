@@ -189,8 +189,19 @@ class FarmerDatabase:
         # 1. Update in Supabase
         if self.supabase:
             try:
-                payload = {**farmer_record, "primary_crops": json.dumps(new_crops) if isinstance(new_crops, list) else new_crops}
-                self.supabase.table("farmers").upsert(payload).execute()
+                payload = {
+                    "phone_number": phone,
+                    "name": new_name,
+                    "village": new_village,
+                    "district": new_district,
+                    "state": new_state,
+                    "acreage": float(new_acreage or 0.0),
+                    "primary_crops": new_crops if isinstance(new_crops, list) else [str(new_crops)],
+                    "own_transport": new_transport,
+                    "updated_at": now_ts
+                }
+                res = self.supabase.table("farmers").upsert(payload).execute()
+                print(f"[FarmerDB:Supabase] Upserted farmer {phone}: {res.data}")
             except Exception as e:
                 print(f"[FarmerDB:Supabase] update_farmer error: {e}")
 

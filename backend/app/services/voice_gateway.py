@@ -65,6 +65,19 @@ class VoiceGatewaySession:
             dm_session.farmer_name = "Kisan Bhai"
             dm_session.location_name = "Shivrajpur"
             dm_session.step = "OPEN_CONVERSATION"
+            if self.phone_number:
+                try:
+                    farmer = farmer_db.update_farmer_profile(
+                        phone_number=self.phone_number,
+                        name="Kisan Bhai",
+                        village="Shivrajpur",
+                        district="Nashik",
+                        state="Maharashtra",
+                        primary_crops=["Tamatar", "Pyaaz"]
+                    )
+                    print(f"[VoiceGateway] Auto-persisted new farmer {self.phone_number} to Supabase")
+                except Exception as e:
+                    print(f"[VoiceGateway] Farmer auto-persist error: {e}")
 
         print(f"[VoiceGateway] Call initiated: session={self.session_id}, phone={self.phone_number}, is_new={greeting_res['is_new']}, step={dm_session.step}")
         
@@ -186,6 +199,35 @@ class VoiceGatewaySession:
         spoken_text = res.get("spoken_text", "")
         step = res.get("step", "")
         extra_data = res.get("data", {})
+
+        # Automatically log every conversation turn into Supabase database
+        if self.phone_number:
+            try:
+                dm_session = dialogue_manager.get_or_create_session(self.session_id)
+                farmer_db.log_query(
+                    phone_number=self.phone_number,
+                    query_type=step or "voice_query",
+                    commodity=dm_session.commodity,
+                    quantity=f"{dm_session.quantity_quintals} qtl" if dm_session.quantity_quintals else None,
+                    utterance=text,
+                    response=spoken_text
+                )
+
+                # If mandi answered or arbitrage calculated, save to advisory_reports as well
+                if step in ["COMMODITY_ANSWERED", "ARBITRAGE_DELIVERED"]:
+                    comm = dm_session.commodity or extra_data.get("commodity", "Produce")
+                    top_m = extra_data.get("top_mandis", ["APMC Mandi"])[0] if isinstance(extra_data.get("top_mandis"), list) else "APMC Mandi"
+                    rate = float(extra_data.get("benchmark_price", 1850))
+                    farmer_db.save_advisory_report(
+                        phone_number=self.phone_number,
+                        session_id=self.session_id,
+                        commodity=comm,
+                        best_mandi=top_m,
+                        net_profit=round(rate * (dm_session.quantity_quintals or 10.0), 2),
+                        summary_text=spoken_text
+                    )
+            except Exception as e:
+                print(f"[VoiceGateway] Supabase turn logging error: {e}")
 
         # If turn was interrupted during reasoning, abort
         if turn_id != self.active_turn_id:
