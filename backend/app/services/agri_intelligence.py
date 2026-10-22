@@ -15,6 +15,7 @@ import re
 from typing import Dict, Any, Optional, Tuple, List
 from app.services.mandi_service import mandi_service, haversine_distance
 from app.services.enam_rules import enam_advisor
+from app.services.agri_rag import agri_rag
 
 # Comprehensive Indian State & Major Agricultural District Geolocation Mapping
 STATE_DISTRICT_MAP = {
@@ -314,7 +315,14 @@ class AgriIntelligenceEngine:
             if loc_res:
                 return loc_res
 
-        # 2. Check for Crop Doctor / Disease / Pest Diagnosis (even if crop name is mentioned)
+        # 2. Check Agri-RAG for Scientific ICAR / KVK Advisory (Diseases, Pests, Fertilizer, Sowing, Schemes)
+        is_price_query = any(w in text for w in ["bhav", "rate", "bhav kya", "rate kya", "kimat", "mandi rate", "aaj ka rate", "भाव क्या", "मंडी भाव", "रेट बताओ", "का भाव", "के भाव"])
+        if not is_price_query:
+            rag_res = agri_rag.answer_query(text, session.farmer_name)
+            if rag_res:
+                return rag_res
+
+        # 3. Check for Crop Doctor / Disease / Pest Diagnosis fallback
         disease_res = self._handle_disease_pest_query(text, session)
         if disease_res:
             return disease_res
@@ -472,6 +480,22 @@ class AgriIntelligenceEngine:
                     "data": {"location": display_name}
                 }
         else:
+            # Check if user asked an advisory question or if Agri-RAG matches
+            if agri_rag.retrieve(text, top_k=1):
+                session.step = "ACTIVE"
+                return None
+
+            other_intent_keywords = [
+                "bimari", "keeda", "keede", "rog", "patte", "dawai", "spray", "sundi", "thrips", "safed makhi", "chhed",
+                "urea", "dap", "npk", "khad", "fertilizer", "khat", "zinc", "sulphur", "peelapan", "peele",
+                "enam", "commission", "aadhatiya", "yojana", "bima", "pm kisan", "kcc", "loan",
+                "बीमारी", "कीड़ा", "कीड़े", "रोग", "पत्ते", "दवाई", "दवा", "स्प्रे", "सुंडी", "थ्रिप्स", "सफेद मक्खी", "छेद",
+                "यूरिया", "डीएपी", "एनपीके", "खाद", "जिंक", "सल्फर", "पीलापन", "पीले", "कमीशन", "आढ़तिया", "दलाली", "योजना", "बीमा", "ऋण", "लोन"
+            ]
+            if any(w in text for w in other_intent_keywords):
+                session.step = "ACTIVE"
+                return None
+
             return {
                 "spoken_text": (
                     f"Kisan bhai, kripya apna rajya (state) ya mukhya jila saaf batayein, "
@@ -979,7 +1003,12 @@ class AgriIntelligenceEngine:
         f_name = session.farmer_name or "Kisan Bhai"
         clean = text.strip()
 
-        # Crop mentions inside free text
+        # 1. Try scientific Agri-RAG knowledge base first
+        rag_res = agri_rag.answer_query(clean, f_name)
+        if rag_res:
+            return rag_res
+
+        # 2. Crop mentions inside free text
         if any(w in clean for w in ["tamatar", "टमाटर", "tomato"]):
             return {
                 "spoken_text": f"{f_name} ji, tamatar ka bhav aaj lagbhag ₹1,550 se ₹1,850 prati quintal chal raha hai. Aapke paas bechne ke liye kitne crates ya quintal tamatar hain?",
