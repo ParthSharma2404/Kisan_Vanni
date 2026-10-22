@@ -56,24 +56,25 @@ class VoiceGatewaySession:
 
         if farmer:
             dm_session.farmer_name = farmer.get("name", "Kisan Bhai")
-            if farmer.get("district"):
-                dm_session.district = farmer["district"]
-            if farmer.get("village"):
-                dm_session.location_name = farmer["village"]
-            dm_session.step = "OPEN_CONVERSATION"
+            dm_session.district = farmer.get("district") or ""
+            dm_session.state = farmer.get("state") or ""
+            dm_session.location_name = farmer.get("village") or ""
+            dm_session.step = "ACTIVE"
         else:
             dm_session.farmer_name = "Kisan Bhai"
-            dm_session.location_name = "Shivrajpur"
-            dm_session.step = "OPEN_CONVERSATION"
+            dm_session.district = ""
+            dm_session.state = ""
+            dm_session.location_name = ""
+            dm_session.step = "ACTIVE"
             if self.phone_number:
                 try:
                     farmer = farmer_db.update_farmer_profile(
                         phone_number=self.phone_number,
                         name="Kisan Bhai",
-                        village="Shivrajpur",
-                        district="Nashik",
-                        state="Maharashtra",
-                        primary_crops=["Tamatar", "Pyaaz"]
+                        village="",
+                        district="",
+                        state="",
+                        primary_crops=[]
                     )
                     print(f"[VoiceGateway] Auto-persisted new farmer {self.phone_number} to Supabase")
                 except Exception as e:

@@ -79,6 +79,8 @@ class LLMService:
         return self._generate_sovereign_response(user_query, farmer_name, village, district, crops, context_data)
 
     def _get_evon_client(self):
+        if self._evon_client is False:
+            return None
         if self._evon_client is None:
             try:
                 from gradio_client import Client
@@ -88,7 +90,8 @@ class LLMService:
                     verbose=False
                 )
             except Exception as e:
-                print(f"[LLMService:Evon] Client init error: {e}")
+                print(f"[LLMService:Evon] Evon Space offline or unreachable ({e}). Using ultra-fast Indic Reasoning Core.")
+                self._evon_client = False
                 return None
         return self._evon_client
 
@@ -113,8 +116,8 @@ class LLMService:
             elif isinstance(res, (list, dict)):
                 return str(res)
         except Exception as e:
-            print(f"[LLMService:Evon] Predict error: {e}")
-            self._evon_client = None
+            print(f"[LLMService:Evon] Predict error: {e}. Disabling Evon space.")
+            self._evon_client = False
         return None
 
     async def _call_evon(

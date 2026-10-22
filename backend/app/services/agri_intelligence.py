@@ -16,7 +16,108 @@ from typing import Dict, Any, Optional, Tuple, List
 from app.services.mandi_service import mandi_service, haversine_distance
 from app.services.enam_rules import enam_advisor
 
-# Benchmark Mandi Rates & MSP for 40+ Indian Agricultural Commodities (Per Quintal)
+# Comprehensive Indian State & Major Agricultural District Geolocation Mapping
+STATE_DISTRICT_MAP = {
+    # Punjab
+    "punjab": ("punjab", "Punjab"), "पंजाब": ("punjab", "Punjab"),
+    "ludhiana": ("punjab", "Ludhiana"), "लुधियाना": ("punjab", "Ludhiana"),
+    "jalandhar": ("punjab", "Jalandhar"), "जालंधर": ("punjab", "Jalandhar"),
+    "amritsar": ("punjab", "Amritsar"), "अमृतसर": ("punjab", "Amritsar"),
+    "bathinda": ("punjab", "Bathinda"), "बठिंडा": ("punjab", "Bathinda"),
+    "khanna": ("punjab", "Khanna"), "खन्ना": ("punjab", "Khanna"),
+    "patiala": ("punjab", "Patiala"), "पटियाला": ("punjab", "Patiala"),
+    "sangrur": ("punjab", "Sangrur"), "संगरूर": ("punjab", "Sangrur"),
+    "moga": ("punjab", "Moga"), "मोगा": ("punjab", "Moga"),
+    
+    # Haryana
+    "haryana": ("haryana", "Haryana"), "हरियाणा": ("haryana", "Haryana"),
+    "karnal": ("haryana", "Karnal"), "करनाल": ("haryana", "Karnal"),
+    "hisar": ("haryana", "Hisar"), "हिसार": ("haryana", "Hisar"),
+    "sirsa": ("haryana", "Sirsa"), "सिरसा": ("haryana", "Sirsa"),
+    "ambala": ("haryana", "Ambala"), "अंबाला": ("haryana", "Ambala"),
+    "panipat": ("haryana", "Panipat"), "पानीपत": ("haryana", "Panipat"),
+    "rohtak": ("haryana", "Rohtak"), "रोहतक": ("haryana", "Rohtak"),
+    "sonipat": ("haryana", "Sonipat"), "सोनीपत": ("haryana", "Sonipat"),
+
+    # Uttar Pradesh
+    "up": ("up", "Uttar Pradesh"), "uttar pradesh": ("up", "Uttar Pradesh"), "उत्तर प्रदेश": ("up", "Uttar Pradesh"), "यूपी": ("up", "Uttar Pradesh"),
+    "agra": ("up", "Agra"), "आगरा": ("up", "Agra"),
+    "kanpur": ("up", "Kanpur"), "कानपुर": ("up", "Kanpur"),
+    "meerut": ("up", "Meerut"), "मेरठ": ("up", "Meerut"),
+    "farrukhabad": ("up", "Farrukhabad"), "फर्रुखाबाद": ("up", "Farrukhabad"),
+    "varanasi": ("up", "Varanasi"), "वाराणसी": ("up", "Varanasi"),
+    "aligarh": ("up", "Aligarh"), "अलीगढ़": ("up", "Aligarh"),
+    "bareilly": ("up", "Bareilly"), "बरेली": ("up", "Bareilly"),
+    "lucknow": ("up", "Lucknow"), "लखनऊ": ("up", "Lucknow"),
+    "barabanki": ("up", "Barabanki"), "बाराबंकी": ("up", "Barabanki"),
+    "gorakhpur": ("up", "Gorakhpur"), "गोरखपुर": ("up", "Gorakhpur"),
+
+    # Madhya Pradesh
+    "mp": ("mp", "Madhya Pradesh"), "madhya pradesh": ("mp", "Madhya Pradesh"), "मध्य प्रदेश": ("mp", "Madhya Pradesh"), "एमपी": ("mp", "Madhya Pradesh"),
+    "indore": ("mp", "Indore"), "इंदौर": ("mp", "Indore"),
+    "ujjain": ("mp", "Ujjain"), "उज्जैन": ("mp", "Ujjain"),
+    "bhopal": ("mp", "Bhopal"), "भोपाल": ("mp", "Bhopal"),
+    "neemuch": ("mp", "Neemuch"), "नीमच": ("mp", "Neemuch"),
+    "mandsaur": ("mp", "Mandsaur"), "मंदसौर": ("mp", "Mandsaur"),
+    "dewas": ("mp", "Dewas"), "देवास": ("mp", "Dewas"),
+    "jabalpur": ("mp", "Jabalpur"), "जबलपुर": ("mp", "Jabalpur"),
+    "sehore": ("mp", "Sehore"), "सीहोर": ("mp", "Sehore"),
+    "vidisha": ("mp", "Vidisha"), "विदिशा": ("mp", "Vidisha"),
+
+    # Rajasthan
+    "rajasthan": ("rajasthan", "Rajasthan"), "राजस्थान": ("rajasthan", "Rajasthan"),
+    "jaipur": ("rajasthan", "Jaipur"), "जयपुर": ("rajasthan", "Jaipur"),
+    "kota": ("rajasthan", "Kota"), "कोटा": ("rajasthan", "Kota"),
+    "bikaner": ("rajasthan", "Bikaner"), "बीकानेर": ("rajasthan", "Bikaner"),
+    "jodhpur": ("rajasthan", "Jodhpur"), "जोधपुर": ("rajasthan", "Jodhpur"),
+    "ganganagar": ("rajasthan", "Sri Ganganagar"), "गंगानगर": ("rajasthan", "Sri Ganganagar"),
+    "alwar": ("rajasthan", "Alwar"), "अलवर": ("rajasthan", "Alwar"),
+    "merta": ("rajasthan", "Merta City"), "मेड़ता": ("rajasthan", "Merta City"),
+    "bharatpur": ("rajasthan", "Bharatpur"), "भरतपुर": ("rajasthan", "Bharatpur"),
+
+    # Maharashtra
+    "maharashtra": ("maharashtra", "Maharashtra"), "महाराष्ट्र": ("maharashtra", "Maharashtra"),
+    "nashik": ("maharashtra", "Nashik"), "नासिक": ("maharashtra", "Nashik"),
+    "pimpalgaon": ("maharashtra", "Pimpalgaon"), "पिंपलगांव": ("maharashtra", "Pimpalgaon"),
+    "lasalgaon": ("maharashtra", "Lasalgaon"), "लासलगांव": ("maharashtra", "Lasalgaon"),
+    "pune": ("maharashtra", "Pune"), "पुणे": ("maharashtra", "Pune"),
+    "nagpur": ("maharashtra", "Nagpur"), "नागपुर": ("maharashtra", "Nagpur"),
+    "solapur": ("maharashtra", "Solapur"), "सोलापुर": ("maharashtra", "Solapur"),
+    "latur": ("maharashtra", "Latur"), "लातूर": ("maharashtra", "Latur"),
+    "yeola": ("maharashtra", "Yeola"), "येवला": ("maharashtra", "Yeola"),
+    "vashi": ("maharashtra", "Vashi"), "वाशी": ("maharashtra", "Vashi"),
+    "jalgaon": ("maharashtra", "Jalgaon"), "जलगांव": ("maharashtra", "Jalgaon"),
+    "ahmednagar": ("maharashtra", "Ahmednagar"), "अहमदनगर": ("maharashtra", "Ahmednagar"),
+
+    # Gujarat
+    "gujarat": ("gujarat", "Gujarat"), "गुजरात": ("gujarat", "Gujarat"),
+    "rajkot": ("gujarat", "Rajkot"), "राजकोट": ("gujarat", "Rajkot"),
+    "gondal": ("gujarat", "Gondal"), "गोंडल": ("gujarat", "Gondal"),
+    "surat": ("gujarat", "Surat"), "सूरत": ("gujarat", "Surat"),
+    "ahmedabad": ("gujarat", "Ahmedabad"), "अहमदाबाद": ("gujarat", "Ahmedabad"),
+    "unjha": ("gujarat", "Unjha"), "ऊंझा": ("gujarat", "Unjha"),
+    "mahuva": ("gujarat", "Mahuva"), "महुवा": ("gujarat", "Mahuva"),
+
+    # Karnataka
+    "karnataka": ("karnataka", "Karnataka"), "कर्नाटक": ("karnataka", "Karnataka"),
+    "bangalore": ("karnataka", "Bangalore"), "bengaluru": ("karnataka", "Bangalore"), "बेंगलुरु": ("karnataka", "Bangalore"),
+    "kolar": ("karnataka", "Kolar"), "कोलार": ("karnataka", "Kolar"),
+    "hubli": ("karnataka", "Hubli"), "हुबली": ("karnataka", "Hubli"),
+    "belgaum": ("karnataka", "Belagavi"), "बेलगाम": ("karnataka", "Belagavi"),
+
+    # Bihar
+    "bihar": ("bihar", "Bihar"), "बिहार": ("bihar", "Bihar"),
+    "patna": ("bihar", "Patna"), "पटना": ("bihar", "Patna"),
+    "muzaffarpur": ("bihar", "Muzaffarpur"), "मुजफ्फरपुर": ("bihar", "Muzaffarpur"),
+    "gulabbagh": ("bihar", "Gulabbagh"), "गुलाबबाग": ("bihar", "Gulabbagh"),
+
+    # Delhi / NCR
+    "delhi": ("delhi", "Delhi"), "दिल्ली": ("delhi", "Delhi"),
+    "azadpur": ("delhi", "Azadpur"), "आजादपुर": ("delhi", "Azadpur")
+}
+
+# Benchmark Mandi Rates & MSP for Indian Agricultural Commodities (Per Quintal)
+# Contains state-specific APMC mandis, pricing, and advisory
 COMMODITY_DATABASE = {
     # Vegetables
     "onion": {
@@ -26,7 +127,17 @@ COMMODITY_DATABASE = {
         "min_price": 1900,
         "max_price": 2750,
         "top_mandis": ["Lasalgaon (Nashik)", "Pimpalgaon (Nashik)", "Yeola", "Azadpur (Delhi)"],
-        "advisory": "Lasalgaon aur Pimpalgaon mandi me pichle 2 din se aawak normal hai aur bhav mazboot chal raha hai."
+        "advisory": "Wholesale arrivals regular hain aur good quality dry onion par tagda bhav mil raha hai.",
+        "regional_mandis": {
+            "punjab": {"mandis": "Ludhiana aur Khanna", "price": 2600, "range": "₹2,300 se ₹2,900", "note": "Consumption center hone se wholesale maang tagdi hai."},
+            "haryana": {"mandis": "Karnal aur Panipat", "price": 2550, "range": "₹2,250 se ₹2,850", "note": "Delhi Azadpur proximity par achha uthaan hai."},
+            "up": {"mandis": "Agra aur Kanpur", "price": 2500, "range": "₹2,200 se ₹2,800", "note": "UP wholesale mandiyon me rate sthir hai."},
+            "mp": {"mandis": "Indore aur Dewas", "price": 2350, "range": "₹2,000 se ₹2,600", "note": "Malwa belt me daily arrivals steady hain."},
+            "rajasthan": {"mandis": "Alwar aur Jaipur", "price": 2400, "range": "₹2,100 se ₹2,650", "note": "Alwar lal pyaaz par achha rate chal raha hai."},
+            "maharashtra": {"mandis": "Lasalgaon aur Pimpalgaon", "price": 2450, "range": "₹2,100 se ₹2,750", "note": "Lasalgaon aur Pimpalgaon me quality dry pyaaz ki strong buying hai."},
+            "gujarat": {"mandis": "Gondal aur Mahuva", "price": 2300, "range": "₹2,000 se ₹2,550", "note": "Saurashtra belt me white aur red onion steady hai."},
+            "karnataka": {"mandis": "Bangalore aur Hubli", "price": 2650, "range": "₹2,350 se ₹3,050", "note": "South consumption centers me bhav bohot uncha hai."}
+        }
     },
     "tomato": {
         "names": ["tomato", "tamatar", "tamaatar", "tamater", "टमाटर", "टमाटार", "टोमेटो"],
@@ -35,7 +146,18 @@ COMMODITY_DATABASE = {
         "min_price": 1100,
         "max_price": 1850,
         "top_mandis": ["Pimpalgaon", "Nashik Dindori", "Kolar (Karnataka)", "Madanapalle"],
-        "advisory": "Hybrid tamatar ki maang local mandi aur Bangalore side me achhi hai. A Grade packing par ₹200 extra mil raha hai."
+        "advisory": "Hybrid crate packing par ₹150 se ₹200 extra premium rate mil raha hai.",
+        "regional_mandis": {
+            "punjab": {"mandis": "Ludhiana aur Jalandhar", "price": 1500, "range": "₹1,350 se ₹1,650", "note": "Punjab local mandiyon me hybrid tamatar ka uthaan achha hai."},
+            "haryana": {"mandis": "Karnal aur Ambala", "price": 1450, "range": "₹1,300 se ₹1,600", "note": "Delhi NCR border mandiyon me direct delivery par behtar rate hai."},
+            "up": {"mandis": "Agra aur Kanpur", "price": 1380, "range": "₹1,250 se ₹1,550", "note": "UP me local aawak normal chal rahi hai."},
+            "mp": {"mandis": "Indore aur Ujjain", "price": 1420, "range": "₹1,300 se ₹1,600", "note": "Indore APMC me trading subah se tezi me hai."},
+            "rajasthan": {"mandis": "Jaipur (Muhana) aur Kota", "price": 1520, "range": "₹1,350 se ₹1,700", "note": "Muhana mandi Jaipur me wholesale maang tagdi hai."},
+            "maharashtra": {"mandis": "Pimpalgaon aur Nashik", "price": 1550, "range": "₹1,400 se ₹1,800", "note": "Pimpalgaon me hybrid crate packing par sabse uncha bhav mil raha hai."},
+            "gujarat": {"mandis": "Rajkot aur Ahmedabad", "price": 1480, "range": "₹1,350 se ₹1,650", "note": "Saurashtra wholesale trading smooth chal rahi hai."},
+            "karnataka": {"mandis": "Kolar aur Bangalore", "price": 1650, "range": "₹1,450 se ₹1,900", "note": "Kolar APMC me interstate traders ki active buying hai."},
+            "bihar": {"mandis": "Patna aur Muzaffarpur", "price": 1420, "range": "₹1,280 se ₹1,580", "note": "Local mandiyon me maang sthir hai."}
+        }
     },
     "potato": {
         "names": ["potato", "aloo", "alu", "batata", "आलू", "आलु", "बटाटा"],
@@ -44,7 +166,31 @@ COMMODITY_DATABASE = {
         "min_price": 1300,
         "max_price": 1950,
         "top_mandis": ["Agra", "Farrukhabad", "Indore", "Azadpur"],
-        "advisory": "Cold storage nikaasi ke chalte bhav sthir hai. Jyoti aur Pukhraj variety ko achha uthaan mil raha hai."
+        "advisory": "Cold storage nikaasi ke chalte bhav sthir hai. Jyoti aur Pukhraj variety ko achha uthaan mil raha hai.",
+        "regional_mandis": {
+            "up": {"mandis": "Agra aur Farrukhabad", "price": 1550, "range": "₹1,300 se ₹1,750", "note": "Agra belt me Pukhraj aur 3797 variety ki tagdi khareed hai."},
+            "punjab": {"mandis": "Jalandhar aur Ludhiana", "price": 1500, "range": "₹1,250 se ₹1,650", "note": "Seed potato aur table potato dono me regular trading hai."},
+            "haryana": {"mandis": "Karnal aur Kurukshetra", "price": 1520, "range": "₹1,280 se ₹1,680", "note": "Direct processing plants supply par achha rate hai."},
+            "mp": {"mandis": "Indore aur Ujjain", "price": 1600, "range": "₹1,350 se ₹1,800", "note": "Indore mandi me wafer potato par premium mil raha hai."},
+            "maharashtra": {"mandis": "Manchar, Pune aur Vashi", "price": 1750, "range": "₹1,450 se ₹2,050", "note": "Metro demand ke chalte rate uncha bana hua hai."},
+            "west bengal": {"mandis": "Burdwan aur Hooghly", "price": 1580, "range": "₹1,350 se ₹1,750", "note": "Jyoti aloo ki Kolkata consumption demand mazboot hai."}
+        }
+    },
+    "wheat": {
+        "names": ["wheat", "gehu", "gehun", "gahu", "गेहूं", "गेहू", "कनक"],
+        "hindi": "Gehun",
+        "benchmark_price": 2720,
+        "min_price": 2425,
+        "max_price": 2980,
+        "top_mandis": ["Indore (MP)", "Ujjain (MP)", "Khanna (Punjab)", "Hapur (UP)"],
+        "advisory": "Government MSP ₹2,425 hai, par open market millers dry clean lot par ₹2,700 ke upar khareed rahe hain.",
+        "regional_mandis": {
+            "punjab": {"mandis": "Khanna aur Ludhiana", "price": 2480, "range": "₹2,425 se ₹2,600", "note": "Khanna Asia ki sabse badi anaj mandi me direct procurement active hai."},
+            "haryana": {"mandis": "Karnal aur Sirsa", "price": 2460, "range": "₹2,425 se ₹2,580", "note": "MSP se upar flour millers ki direct purchase chal rahi hai."},
+            "mp": {"mandis": "Indore, Sehore aur Vidisha", "price": 2850, "range": "₹2,500 se ₹3,200", "note": "Sharbati aur Lokwan gehun par millers tagda premium de rahe hain."},
+            "up": {"mandis": "Hapur, Kanpur aur Agra", "price": 2550, "range": "₹2,425 se ₹2,700", "note": "Local flour mills me non-stop demand bani hui hai."},
+            "rajasthan": {"mandis": "Kota aur Sri Ganganagar", "price": 2580, "range": "₹2,450 se ₹2,750", "note": "Clean bold wheat par achha bhav mil raha hai."}
+        }
     },
     "garlic": {
         "names": ["garlic", "lahsun", "lehsun", "lahsan", "लहसुन", "लहसन", "लहसून"],
@@ -53,157 +199,12 @@ COMMODITY_DATABASE = {
         "min_price": 8500,
         "max_price": 14200,
         "top_mandis": ["Mandsaur (MP)", "Neemuch (MP)", "Kota (Rajasthan)"],
-        "advisory": "Ooty aur Desi lahsun me tezi bani hui hai. Super box quality 13 hazar ke paar bik rahi hai."
-    },
-    "ginger": {
-        "names": ["ginger", "adrak", "adrakh", "aaley", "अदरक", "आदा"],
-        "hindi": "Adrak",
-        "benchmark_price": 6800,
-        "min_price": 5200,
-        "max_price": 8100,
-        "top_mandis": ["Wayanad", "Shimoga", "Nashik", "Azadpur"],
-        "advisory": "Nayi geeli adrak aane se bhav normal level par chal raha hai."
-    },
-    "chilli": {
-        "names": ["chilli", "chili", "mirchi", "mirch", "hari mirch", "lal mirch", "मिर्च", "मिर्ची", "हरी मिर्च", "लाल मिर्च"],
-        "hindi": "Mirchi",
-        "benchmark_price": 4200,
-        "min_price": 3100,
-        "max_price": 5400,
-        "top_mandis": ["Guntur (AP)", "Warangal", "Byadgi (Karnataka)", "Nagpur"],
-        "advisory": "Teja aur Byadgi mirchi export quality me bohot uncha bhav de rahi hai."
-    },
-    "cauliflower": {
-        "names": ["cauliflower", "phoolgobhi", "gobhi", "gobi", "फूलगोभी", "गोभी", "फूल गोभी"],
-        "hindi": "Phool Gobhi",
-        "benchmark_price": 1400,
-        "min_price": 900,
-        "max_price": 1750,
-        "top_mandis": ["Nashik", "Hapur", "Ranchi", "Vashi"],
-        "advisory": "Local mandiyon me aawak badhne se subah jaldi le jaane par behtar rate milta hai."
-    },
-    "cabbage": {
-        "names": ["cabbage", "bandgobhi", "patta gobhi", "pattagobhi", "पत्तागोभी", "पत्ता गोभी", "बंदगोभी"],
-        "hindi": "Patta Gobhi",
-        "benchmark_price": 1100,
-        "min_price": 750,
-        "max_price": 1450,
-        "top_mandis": ["Pune", "Nashik", "Indore", "Azadpur"],
-        "advisory": "Firm aur green head wali gobhi ki wholesale maang tagdi hai."
-    },
-    "brinjal": {
-        "names": ["brinjal", "eggplant", "baingan", "bhanta", "vangi", "बैंगन", "बैगन", "भांटा"],
-        "hindi": "Baingan",
-        "benchmark_price": 1350,
-        "min_price": 850,
-        "max_price": 1700,
-        "top_mandis": ["Nashik", "Nagpur", "Barabanki", "Vashi"],
-        "advisory": "Kaala aur chamakdar baingan bina keede ke sabse zyada dam par uth raha hai."
-    },
-    "okra": {
-        "names": ["okra", "ladyfinger", "bhindi", "bhendi", "भिंडी", "भेंडी"],
-        "hindi": "Bhindi",
-        "benchmark_price": 2800,
-        "min_price": 2100,
-        "max_price": 3600,
-        "top_mandis": ["Vashi (Mumbai)", "Nashik", "Surat", "Jaipur"],
-        "advisory": "Chhoti aur mulayam hari bhindi ko metro mandiyon me premium rate mil raha hai."
-    },
-
-    # Cereals & Grains
-    "wheat": {
-        "names": ["wheat", "gehu", "gehun", "gahu", "गेहूं", "गेहू", "कनक"],
-        "hindi": "Gehun",
-        "benchmark_price": 2720,
-        "min_price": 2425,
-        "max_price": 2980,
-        "top_mandis": ["Indore (MP)", "Ujjain (MP)", "Khanna (Punjab)", "Hapur (UP)"],
-        "advisory": "Government MSP ₹2,425 hai, par open market me millers ₹2,700 ke upar khareed rahe hain."
-    },
-    "paddy": {
-        "names": ["paddy", "rice", "dhan", "chawal", "dhaan", "basmati", "धान", "चावल", "बासमती"],
-        "hindi": "Dhan (Paddy)",
-        "benchmark_price": 2320,
-        "min_price": 2300,
-        "max_price": 3950,
-        "top_mandis": ["Karnal (Haryana)", "Bhatinda (Punjab)", "Gondia (MH)", "Burdwan (WB)"],
-        "advisory": "Grade-A Dhan ka MSP ₹2,320 hai. Basmati 1509 aur 1718 me rate ₹3,600 se ₹4,000 chal raha hai."
-    },
-    "maize": {
-        "names": ["maize", "corn", "makka", "makai", "bhutta", "मक्का", "मकई", "भुट्टा"],
-        "hindi": "Makka",
-        "benchmark_price": 2225,
-        "min_price": 1950,
-        "max_price": 2450,
-        "top_mandis": ["Davangere (Karnataka)", "Gulabbagh (Bihar)", "Chhindwara (MP)", "Nanded"],
-        "advisory": "Poultry feed aur ethanol plants ki maang se makka ka bhav mazboot hai. 14% se kam moisture par top rate milta hai."
-    },
-    "bajra": {
-        "names": ["bajra", "pearl millet", "bajri", "बाजरा", "बाजरी"],
-        "hindi": "Bajra",
-        "benchmark_price": 2625,
-        "min_price": 2350,
-        "max_price": 2850,
-        "top_mandis": ["Jaipur", "Alwar", "Agra", "Ahmednagar"],
-        "advisory": "Government procurement aur shardi ki maang se bajra MSP ke upar trade ho raha hai."
-    },
-    "jowar": {
-        "names": ["jowar", "sorghum", "jowari", "ज्वार", "ज्वारी"],
-        "hindi": "Jowar",
-        "benchmark_price": 3370,
-        "min_price": 3180,
-        "max_price": 3800,
-        "top_mandis": ["Solapur (MH)", "Latur (MH)", "Gulbarga (Karnataka)"],
-        "advisory": "Maldandi quality jowar ko urban health consumers ke liye premium price milta hai."
-    },
-
-    # Pulses (Dal)
-    "chana": {
-        "names": ["chana", "gram", "chickpea", "bengal gram", "chane", "चना", "चने", "छोला"],
-        "hindi": "Chana",
-        "benchmark_price": 6150,
-        "min_price": 5600,
-        "max_price": 6600,
-        "top_mandis": ["Bikaner (Rajasthan)", "Indore (MP)", "Akola (MH)", "Latur (MH)"],
-        "advisory": "Chana ka MSP ₹5,650 hai. Dal millers ki maang se rate lagbhag ₹6,150 prati quintal chal raha hai."
-    },
-    "tur": {
-        "names": ["tur", "arhar", "pigeon pea", "tuvar", "arhar dal", "अरहर", "तुअर", "तूर"],
-        "hindi": "Tur (Arhar)",
-        "benchmark_price": 10200,
-        "min_price": 8800,
-        "max_price": 11400,
-        "top_mandis": ["Gulbarga (Karnataka)", "Latur (MH)", "Akola (MH)", "Katni (MP)"],
-        "advisory": "Tur dal ki supply tight hone ki wajah se mandi me tezi hai. Safed tur sabse tezi me hai."
-    },
-    "moong": {
-        "names": ["moong", "green gram", "mung", "मूंग", "मूँग"],
-        "hindi": "Moong",
-        "benchmark_price": 8680,
-        "min_price": 7900,
-        "max_price": 9200,
-        "top_mandis": ["Merta City (Rajasthan)", "Nagaur", "Indore", "Jalgaon"],
-        "advisory": "Chamkila mota moong bohot tezi se khareeda ja raha hai. NAFED procurement bhi active hai."
-    },
-    "urad": {
-        "names": ["urad", "black gram", "udid", "उड़द", "उडद"],
-        "hindi": "Urad",
-        "benchmark_price": 7400,
-        "min_price": 6800,
-        "max_price": 8100,
-        "top_mandis": ["Latur", "Nanded", "Jabalpur", "Barabanki"],
-        "advisory": "Dal millers ki steady buying se bhav Mazboot hai."
-    },
-
-    # Oilseeds
-    "soyabean": {
-        "names": ["soyabean", "soybean", "soya", "सोयाबीन", "सोया"],
-        "hindi": "Soyabean",
-        "benchmark_price": 4500,
-        "min_price": 4100,
-        "max_price": 4850,
-        "top_mandis": ["Indore (MP)", "Dewas (MP)", "Latur (MH)", "Kota (Rajasthan)"],
-        "advisory": "MSP ₹4,892 ke aas-paas hai. Crushing plants dry yellow soyabean par achha bhav de rahe hain."
+        "advisory": "Ooty aur Desi lahsun me tezi bani hui hai. Super box quality 13 hazar ke paar bik rahi hai.",
+        "regional_mandis": {
+            "mp": {"mandis": "Mandsaur aur Neemuch", "price": 12000, "range": "₹9,500 se ₹14,500", "note": "Mandsaur me Desi aur Ooty variety par desh bhar ke traders ki buying hai."},
+            "rajasthan": {"mandis": "Kota aur Pratapgarh", "price": 11500, "range": "₹9,000 se ₹13,800", "note": "Box packing quality ko top rate mil raha hai."},
+            "gujarat": {"mandis": "Gondal aur Rajkot", "price": 11800, "range": "₹9,200 se ₹14,000", "note": "Export demand ke chalte bhav uncha hai."}
+        }
     },
     "mustard": {
         "names": ["mustard", "sarso", "sarson", "rai", "toria", "सरसों", "सरसो", "राई"],
@@ -212,19 +213,14 @@ COMMODITY_DATABASE = {
         "min_price": 5400,
         "max_price": 6300,
         "top_mandis": ["Bharatpur (Rajasthan)", "Jaipur", "Hisar (Haryana)", "Morena (MP)"],
-        "advisory": "42% oil condition wali sarson ₹5,800 se ₹6,100 tak asani se bik rahi hai."
+        "advisory": "42% oil condition wali sarson ₹5,800 se ₹6,100 tak asani se bik rahi hai.",
+        "regional_mandis": {
+            "rajasthan": {"mandis": "Bharatpur, Jaipur aur Alwar", "price": 5950, "range": "₹5,600 se ₹6,300", "note": "Bharatpur APMC me oil mills ki non-stop buying hai."},
+            "haryana": {"mandis": "Hisar aur Sirsa", "price": 5850, "range": "₹5,500 se ₹6,150", "note": "High oil content lot par extra premium mil raha hai."},
+            "mp": {"mandis": "Morena aur Bhind", "price": 5800, "range": "₹5,450 se ₹6,100", "note": "Chambal belt me crushing plants active hain."},
+            "up": {"mandis": "Agra aur Mathura", "price": 5750, "range": "₹5,400 se ₹6,050", "note": "Wholesale oil millers ki regular khareed hai."}
+        }
     },
-    "groundnut": {
-        "names": ["groundnut", "peanut", "mungfali", "moongphali", "shengdana", "मूंगफली", "शेंगदाना"],
-        "hindi": "Mungfali",
-        "benchmark_price": 6780,
-        "min_price": 6100,
-        "max_price": 7450,
-        "top_mandis": ["Rajkot (Gujarat)", "Gondal (Gujarat)", "Bikaner", "Kurnool"],
-        "advisory": "Gondal aur Rajkot mandi me bold variety mungfali par export demand ke chalte tagda rate hai."
-    },
-
-    # Cash Crops & Fruits
     "cotton": {
         "names": ["cotton", "kapas", "rui", "narma", "कपास", "रुई", "नरमा"],
         "hindi": "Kapas (Cotton)",
@@ -232,27 +228,73 @@ COMMODITY_DATABASE = {
         "min_price": 7120,
         "max_price": 7950,
         "top_mandis": ["Rajkot (Gujarat)", "Surendranagar", "Yavatmal (MH)", "Sirsa (Haryana)"],
-        "advisory": "Medium staple cotton MSP ₹7,121 aur Long staple ₹7,521 hai. Ginning mills dry lot par full payment de rahi hain."
+        "advisory": "Medium staple MSP ₹7,121 aur Long staple ₹7,521 hai. Ginning mills dry lot par full rate de rahi hain.",
+        "regional_mandis": {
+            "gujarat": {"mandis": "Rajkot aur Gondal", "price": 7650, "range": "₹7,250 se ₹8,050", "note": "Shankar-6 cotton par spinning mills ki tagdi maang hai."},
+            "maharashtra": {"mandis": "Yavatmal aur Jalgaon", "price": 7450, "range": "₹7,150 se ₹7,850", "note": "Vidarbha aur Khandesh me ginning factories active hain."},
+            "punjab": {"mandis": "Bathinda aur Abohar", "price": 7500, "range": "₹7,200 se ₹7,900", "note": "Malwa belt me narma kapas ki achhi khareed hai."},
+            "haryana": {"mandis": "Sirsa aur Fatehabad", "price": 7520, "range": "₹7,250 se ₹7,920", "note": "Dry moisture lot par pura MSP aur bonus rate mil raha hai."}
+        }
     },
-    "sugarcane": {
-        "names": ["sugarcane", "ganna", "eekh", "oos", "गन्ना", "ईख"],
-        "hindi": "Ganna",
-        "benchmark_price": 340,
-        "min_price": 315,
-        "max_price": 365,
-        "top_mandis": ["Meerut (UP)", "Muzaffarnagar (UP)", "Kolhapur (MH)", "Belagavi"],
-        "advisory": "Central FRP rate ₹340 prati quintal hai (10.25% recovery). Mill slip aate hi 14 din me payment anivarya hai."
+    "soyabean": {
+        "names": ["soyabean", "soybean", "soya", "सोयाबीन", "सोया"],
+        "hindi": "Soyabean",
+        "benchmark_price": 4500,
+        "min_price": 4100,
+        "max_price": 4850,
+        "top_mandis": ["Indore (MP)", "Dewas (MP)", "Latur (MH)", "Kota (Rajasthan)"],
+        "advisory": "MSP ₹4,892 ke aas-paas hai. Crushing plants dry yellow soyabean par achha bhav de rahe hain.",
+        "regional_mandis": {
+            "mp": {"mandis": "Indore, Ujjain aur Dewas", "price": 4550, "range": "₹4,200 se ₹4,850", "note": "Asia ke sabse bade soybean processing plants Indore me active hain."},
+            "maharashtra": {"mandis": "Latur aur Akola", "price": 4520, "range": "₹4,180 se ₹4,820", "note": "Marathwada oil mills direct seed purchase kar rahi hain."},
+            "rajasthan": {"mandis": "Kota aur Baran", "price": 4480, "range": "₹4,150 se ₹4,780", "note": "Hadoti belt me steady trading chal rahi hai."}
+        }
     },
-    "banana": {
-        "names": ["banana", "kela", "kele", "केला", "केले"],
-        "hindi": "Kela",
-        "benchmark_price": 1850,
-        "min_price": 1400,
-        "max_price": 2200,
-        "top_mandis": ["Jalgaon (MH)", "Raver", "Burhanpur (MP)", "Theni (TN)"],
-        "advisory": "Grand Naine kela Delhi aur UP ke traders dwara ₹1,800 se ₹2,100 per quintal par uthaya ja raha hai."
+    "paddy": {
+        "names": ["paddy", "rice", "dhan", "chawal", "dhaan", "basmati", "धान", "चावल", "बासमती"],
+        "hindi": "Dhan (Paddy)",
+        "benchmark_price": 2320,
+        "min_price": 2300,
+        "max_price": 3950,
+        "top_mandis": ["Karnal (Haryana)", "Bhatinda (Punjab)", "Gondia (MH)", "Burdwan (WB)"],
+        "advisory": "Grade-A Dhan ka MSP ₹2,320 hai. Basmati 1509 aur 1718 me rate ₹3,600 se ₹4,000 chal raha hai.",
+        "regional_mandis": {
+            "punjab": {"mandis": "Amritsar, Khanna aur Bathinda", "price": 3650, "range": "₹2,320 se ₹4,100", "note": "Basmati 1121 aur 1509 par export millers tagda rate de rahe hain."},
+            "haryana": {"mandis": "Karnal aur Taraori", "price": 3700, "range": "₹2,320 se ₹4,150", "note": "Basmati rice bowl of India me top international exporters active hain."},
+            "up": {"mandis": "Barabanki aur Bareilly", "price": 2350, "range": "₹2,300 se ₹2,600", "note": "Government procurement center par MSP sunishchit hai."},
+            "bihar": {"mandis": "Buxar aur Patna", "price": 2300, "range": "₹2,200 se ₹2,450", "note": "Local PACS aur millers regular purchase kar rahe hain."}
+        }
+    },
+    "chana": {
+        "names": ["chana", "gram", "chickpea", "bengal gram", "chane", "चना", "चने", "छोला"],
+        "hindi": "Chana",
+        "benchmark_price": 6150,
+        "min_price": 5600,
+        "max_price": 6600,
+        "top_mandis": ["Bikaner (Rajasthan)", "Indore (MP)", "Akola (MH)", "Latur (MH)"],
+        "advisory": "Chana ka MSP ₹5,650 hai. Dal millers ki maang se rate lagbhag ₹6,150 prati quintal chal raha hai.",
+        "regional_mandis": {
+            "rajasthan": {"mandis": "Bikaner aur Jaipur", "price": 6250, "range": "₹5,800 se ₹6,650", "note": "Dal millers ki continuous demand se bhav uncha hai."},
+            "mp": {"mandis": "Indore aur Vidisha", "price": 6180, "range": "₹5,750 se ₹6,550", "note": "Desi aur dollar chana dono me achha uthaan hai."},
+            "maharashtra": {"mandis": "Latur aur Akola", "price": 6100, "range": "₹5,680 se ₹6,500", "note": "Wholesale pulses trading active hai."}
+        }
+    },
+    "maize": {
+        "names": ["maize", "corn", "makka", "makai", "bhutta", "मक्का", "मकई", "भुट्टा"],
+        "hindi": "Makka",
+        "benchmark_price": 2225,
+        "min_price": 1950,
+        "max_price": 2450,
+        "top_mandis": ["Davangere (Karnataka)", "Gulabbagh (Bihar)", "Chhindwara (MP)", "Nanded"],
+        "advisory": "Poultry feed aur ethanol plants ki maang se makka ka bhav mazboot hai.",
+        "regional_mandis": {
+            "bihar": {"mandis": "Gulabbagh (Purnia) aur Begusarai", "price": 2300, "range": "₹2,050 se ₹2,480", "note": "Gulabbagh Asia ki sabse badi makka mandi me round-the-clock trading hai."},
+            "mp": {"mandis": "Chhindwara aur Betul", "price": 2240, "range": "₹1,980 se ₹2,420", "note": "Corn starch aur feed factories bulk khareed rahi hain."},
+            "karnataka": {"mandis": "Davangere aur Ranebennur", "price": 2280, "range": "₹2,020 se ₹2,460", "note": "Poultry hubs ki steady demand hai."}
+        }
     }
 }
+
 
 class AgriIntelligenceEngine:
     """
@@ -266,46 +308,64 @@ class AgriIntelligenceEngine:
         # 0. Background Profile Extraction (Silently update profile without blocking)
         self._silent_profile_extraction(text, session)
 
-        # 1. Check for Crop Doctor / Disease / Pest Diagnosis (even if crop name is mentioned)
+        # 1. If actively awaiting farmer's location for a crop rate inquiry:
+        if getattr(session, "step", "") == "AWAITING_LOCATION":
+            loc_res = self._handle_location_response(text, session)
+            if loc_res:
+                return loc_res
+
+        # 2. Check for Crop Doctor / Disease / Pest Diagnosis (even if crop name is mentioned)
         disease_res = self._handle_disease_pest_query(text, session)
         if disease_res:
             return disease_res
 
-        # 2. Check for Fertilizer / Soil Nutrition / Urea / DAP (even if crop name is mentioned)
+        # 3. Check for Fertilizer / Soil Nutrition / Urea / DAP
         fertilizer_res = self._handle_fertilizer_nutrition(text, session)
         if fertilizer_res:
             return fertilizer_res
 
-        # 3. Check for Government Schemes & Subsidies (PM-Kisan, KCC, Fasal Bima, Kusum)
+        # 4. Check for Government Schemes & Subsidies (PM-Kisan, KCC, Fasal Bima, Kusum)
         scheme_res = self._handle_government_schemes(text, session)
         if scheme_res:
             return scheme_res
 
-        # 4. Check for eNAM Statutory Mandi Rights & Commission Rules
+        # 5. Check for eNAM Statutory Mandi Rights & Commission Rules
         enam_res = self._handle_enam_and_legal(text, session)
         if enam_res:
             return enam_res
 
-        # 5. Check for Weather, Sowing, Irrigation, Seed Treatment
+        # 6. Check for Weather, Sowing, Irrigation, Seed Treatment
         agronomy_res = self._handle_agronomy_and_weather(text, session)
         if agronomy_res:
             return agronomy_res
 
-        # 6. Check for Mandi Rate / Commodity Pricing / Mandi Arbitrage Inquiry
+        # 7. Check for Mandi Rate / Commodity Pricing / Mandi Arbitrage Inquiry
         mandi_res = self._handle_commodity_query(text, session)
         if mandi_res:
             return mandi_res
 
-        # 7. Check for Chit-chat / Greetings / Name confirmation / Gratitude
+        # 8. Check for Quantity answer if awaiting quantity
+        if getattr(session, "step", "") == "AWAITING_QUANTITY":
+            qty_res = self._handle_quantity_response(text, session)
+            if qty_res:
+                return qty_res
+
+        # 9. Check for Transport answer if awaiting transport
+        if getattr(session, "step", "") == "AWAITING_TRANSPORT":
+            trans_res = self._handle_transport_response(text, session)
+            if trans_res:
+                return trans_res
+
+        # 10. Check for Chit-chat / Greetings / Name confirmation / Gratitude
         chitchat_res = self._handle_chitchat_and_general(text, session)
         if chitchat_res:
             return chitchat_res
 
-        # 8. Open Generative Agricultural Fallback (Never gets stuck, always answers meaningfully)
+        # 11. Open Generative Agricultural Fallback (Never gets stuck, always answers meaningfully)
         return self._generate_open_agri_response(text, session)
 
     def _silent_profile_extraction(self, text: str, session: Any):
-        """Silently extracts farmer name, village, acreage, or crops without interrogating."""
+        """Silently extracts farmer name or location without interrogating."""
         try:
             from app.services.farmer_db import farmer_db
             
@@ -313,19 +373,32 @@ class AgriIntelligenceEngine:
             name_match = re.search(r"(?:mera naam|main|hum|naam)\s+([a-zA-Z\u0900-\u097F]+)(?:\s+(?:hoon|hai|bol))?", text)
             if name_match:
                 extracted = name_match.group(1).strip()
-                if extracted not in ["kisan", "bhaiya", "bol", "yahan", "ek", "do", "bhai", "ji"]:
+                if extracted not in ["kisan", "bhaiya", "bol", "yahan", "ek", "do", "bhai", "ji", "punjab", "haryana"]:
                     session.farmer_name = extracted.capitalize()
                     farmer_db.update_farmer_profile(session.phone_number, name=session.farmer_name)
 
-            # Location extraction: "X gaon se", "X se bol raha", "location X"
-            loc_match = re.search(r"(?:gaon|shehar|district|zila|se)\s+([a-zA-Z\u0900-\u097F]+)", text)
-            if loc_match:
-                extracted_loc = loc_match.group(1).strip()
-                if extracted_loc not in ["bol", "raha", "haan", "nahi", "kisan"]:
-                    session.location_name = extracted_loc.capitalize()
-                    farmer_db.update_location(session.phone_number, village=session.location_name)
+            # Location extraction via dictionary
+            loc_res = self._extract_location_from_text(text)
+            if loc_res:
+                state_code, display_name = loc_res
+                session.state = state_code
+                session.district = display_name
+                session.location_name = display_name
+                farmer_db.update_location(session.phone_number, village=display_name, district=display_name)
         except Exception:
             pass
+
+    def _extract_location_from_text(self, text: str) -> Optional[Tuple[str, str]]:
+        clean = text.lower()
+        for place_key, (state_code, display_name) in STATE_DISTRICT_MAP.items():
+            if any(ord(c) > 127 for c in place_key):
+                if place_key in clean:
+                    return state_code, display_name
+            else:
+                pattern = r"(?:^|\W)" + re.escape(place_key) + r"(?:$|\W)"
+                if re.search(pattern, clean):
+                    return state_code, display_name
+        return None
 
     def _match_commodity(self, text: str) -> Optional[Tuple[str, Dict[str, Any]]]:
         clean_text = text.lower()
@@ -342,93 +415,259 @@ class AgriIntelligenceEngine:
                         return comm_key, comm_data
         return None
 
-    def _handle_commodity_query(self, text: str, session: Any) -> Optional[Dict[str, Any]]:
-        matched = self._match_commodity(text)
-        rate_words = ["bhav", "rate", "bikaav", "bhav kya", "kimat", "mandi", "bechna", "katta", "quintal", "bori", "daam", "kitne me", "भाव", "रेट", "मंडी", "बेचना", "दाम", "कीमत", "वैल्यू", "मार्केट"]
-        
-        # Detect regional state context (Punjab, UP, MP, Rajasthan, MH, etc.)
-        state_note = ""
-        if any(w in text for w in ["punjab", "पंजाब"]):
-            session.district = "Punjab"
-            session.location_name = "Punjab"
-            state_note = "Punjab me Jalandhar, Ludhiana aur Khanna mandiyon me maang achhi rehti hai. Badi quantity ke liye Delhi Azadpur mandi me bhi bhej sakte hain. "
-        elif any(w in text for w in ["nashik", "नासिक", "niphad", "lasalgaon"]):
-            state_note = "Nashik aur Lasalgaon belt me local APMC mandiyon me aawak strong hai. "
+    def _handle_location_response(self, text: str, session: Any) -> Optional[Dict[str, Any]]:
+        loc_res = self._extract_location_from_text(text)
+        if loc_res:
+            state_code, display_name = loc_res
+            session.state = state_code
+            session.district = display_name
+            session.location_name = display_name
+            try:
+                from app.services.farmer_db import farmer_db
+                farmer_db.update_location(session.phone_number, village=display_name, district=display_name)
+            except Exception:
+                pass
 
-        # If commodity found or rate keyword used
-        if matched:
-            comm_key, data = matched
-            session.commodity = comm_key
-            hindi_name = data["hindi"]
-            rate = data["benchmark_price"]
-            min_p = data["min_price"]
-            max_p = data["max_price"]
-            top_m = ", ".join(data["top_mandis"][:2])
-            adv = data["advisory"]
-
-            # Check if farmer also stated quantity
-            num, unit = self._extract_quantity(text)
-            if num:
-                session.raw_quantity_num = num
-                session.unit_type = unit
-                if unit in ["katta", "bori", "bag"]:
-                    qtl = round((num * 50.0) / 100.0, 1)
-                elif unit == "ton":
-                    qtl = round(num * 10.0, 1)
-                elif unit == "pickup":
-                    qtl = round(num * 18.0, 1)
-                elif unit == "trolley":
-                    qtl = round(num * 30.0, 1)
+            comm_key = getattr(session, "commodity", None)
+            if comm_key and comm_key in COMMODITY_DATABASE:
+                comm_data = COMMODITY_DATABASE[comm_key]
+                hindi_name = comm_data["hindi"]
+                reg_info = comm_data.get("regional_mandis", {}).get(state_code)
+                if reg_info:
+                    mandis = reg_info["mandis"]
+                    price = reg_info["price"]
+                    p_range = reg_info["range"]
+                    note = reg_info.get("note", "")
                 else:
-                    qtl = float(num)
-                session.quantity_quintals = qtl
+                    mandis = ", ".join(comm_data["top_mandis"][:2])
+                    price = comm_data["benchmark_price"]
+                    p_range = f"₹{comm_data['min_price']} se ₹{comm_data['max_price']}"
+                    note = comm_data.get("advisory", "")
 
-                total_gross = int(qtl * rate)
                 spoken = (
-                    f"{session.farmer_name} ji! {hindi_name} ka taaza bhav {top_m} me lagbhag ₹{rate} prati quintal chal raha hai "
-                    f"(range ₹{min_p} se ₹{max_p}). {state_note}"
-                    f"Aapke {qtl} quintal maal ka andazan gross moolya lagbhag ₹{total_gross:,} rupaye banta hai! "
-                    f"{adv} "
-                    f"Kya aap gaadi ka diesel kharcha aur seedha munafa calculate karwana chahte hain?"
-                )
-            else:
-                spoken = (
-                    f"{session.farmer_name} ji! Aaj {hindi_name} ka taaza bhav {top_m} mandi me lagbhag ₹{rate} prati quintal chal raha hai, "
-                    f"aur quality ke hisaab se ₹{min_p} se ₹{max_p} tak ka rate hai. {state_note}"
-                    f"{adv} "
+                    f"Ji {session.farmer_name} ji! {display_name} ke paas {mandis} mandiyon me {hindi_name} ka taaza bhav "
+                    f"lagbhag ₹{price:,} prati quintal chal raha hai ({p_range}). {note} "
                     f"Aapke paas bechne ke liye lagbhag kitna maal hai—jaise kitne katte ya quintal?"
                 )
-
-            return {
-                "spoken_text": spoken,
-                "step": "COMMODITY_ANSWERED",
-                "data": {
-                    "commodity": comm_key,
-                    "hindi_name": hindi_name,
-                    "benchmark_price": rate,
-                    "range": f"₹{min_p} - ₹{max_p}",
-                    "top_mandis": data["top_mandis"]
+                session.step = "AWAITING_QUANTITY"
+                return {
+                    "spoken_text": spoken,
+                    "step": "AWAITING_QUANTITY",
+                    "data": {
+                        "commodity": comm_key,
+                        "location": display_name,
+                        "benchmark_price": price,
+                        "range": p_range
+                    }
                 }
-            }
-
-        if any(w in text for w in ["mandi bhav", "taaza bhav", "aaj ka rate", "mandi ka rate", "भाव क्या", "मंडी भाव", "रेट बताओ"]):
+            else:
+                spoken = (
+                    f"Bahut badhiya {session.farmer_name} ji! Maine aapka kshetr {display_name} darj kar liya hai. "
+                    f"Ab batayein aaj kaunsi fasal ka taaza mandi bhav aur munafa dekhna chahte hain?"
+                )
+                session.step = "ACTIVE"
+                return {
+                    "spoken_text": spoken,
+                    "step": "ACTIVE",
+                    "data": {"location": display_name}
+                }
+        else:
             return {
                 "spoken_text": (
-                    f"Ji {session.farmer_name} ji! Main sabhi mukhya faslon—jaise Tamatar, Pyaaz, Gehun, Dhan, Makka, Chana, Soyabean, Aloo aur Kapas "
-                    f"ke live mandi rates track karta hoon. Aap kaunsi fasal ka taaza bhav jaanna chahte hain?"
+                    f"Kisan bhai, kripya apna rajya (state) ya mukhya jila saaf batayein, "
+                    f"jaise Punjab, Haryana, UP, MP ya Maharashtra, taaki main aapke ilake ki mandi ka taaza bhav bata sakoon."
                 ),
-                "step": "OPEN_CONVERSATION",
+                "step": "AWAITING_LOCATION",
                 "data": {}
             }
 
+    def _handle_commodity_query(self, text: str, session: Any) -> Optional[Dict[str, Any]]:
+        matched = self._match_commodity(text)
+        if not matched:
+            if any(w in text for w in ["mandi bhav", "taaza bhav", "aaj ka rate", "mandi ka rate", "भाव क्या", "मंडी भाव", "रेट बताओ", "commodity rate"]):
+                return {
+                    "spoken_text": (
+                        f"Ji {session.farmer_name} ji! Main sabhi mukhya faslon—jaise Tamatar, Pyaaz, Gehun, Dhan, Makka, Chana, Soyabean, Aloo aur Sarson "
+                        f"ke live mandi rates track karta hoon. Aap kaunsi fasal ka taaza bhav jaanna chahte hain?"
+                    ),
+                    "step": "ACTIVE",
+                    "data": {}
+                }
+            return None
+
+        comm_key, data = matched
+        hindi_name = data["hindi"]
+        session.commodity = comm_key
+
+        # 1. Check if location was mentioned in the current query itself
+        loc_res = self._extract_location_from_text(text)
+        if loc_res:
+            state_code, display_name = loc_res
+            session.state = state_code
+            session.district = display_name
+            session.location_name = display_name
+            try:
+                from app.services.farmer_db import farmer_db
+                farmer_db.update_location(session.phone_number, village=display_name, district=display_name)
+            except Exception:
+                pass
+
+        known_state = getattr(session, "state", None) or getattr(session, "district", None)
+
+        # 2. CRITICAL USER SPECIFICATION: IF LOCATION IS UNKNOWN, DO NOT ASSUME NASHIK OR DUMP ALL-INDIA RATES!
+        # DIRECTLY AND POLITELY ASK THE FARMER FOR THEIR DISTRICT / STATE!
+        if not known_state:
+            session.step = "AWAITING_LOCATION"
+            is_english = any(w in text for w in ["what is", "price", "rate of", "tell me", "how much", "rate"])
+            if is_english:
+                spoken = f"Sure {session.farmer_name}! To provide you the exact mandi rate for {data.get('names', [comm_key])[0].capitalize()}, could you please tell me your district or state?"
+            else:
+                spoken = f"Ji {session.farmer_name} ji! {hindi_name} ka sahi aur taaza mandi bhav batane ke liye, aap kripya batayein aap kaunse jile ya rajya (state) se bol rahe hain?"
+            return {
+                "spoken_text": spoken,
+                "step": "AWAITING_LOCATION",
+                "data": {"commodity": comm_key, "hindi_name": hindi_name}
+            }
+
+        # 3. Location is KNOWN: Provide specific regional rates
+        state_key = known_state.lower()
+        reg_info = data.get("regional_mandis", {}).get(state_key)
+        if not reg_info:
+            for r_key, r_val in data.get("regional_mandis", {}).items():
+                if r_key in state_key or state_key in r_key:
+                    reg_info = r_val
+                    break
+
+        if reg_info:
+            mandis = reg_info["mandis"]
+            rate = reg_info["price"]
+            p_range = reg_info["range"]
+            note = reg_info.get("note", "")
+        else:
+            mandis = ", ".join(data["top_mandis"][:2])
+            rate = data["benchmark_price"]
+            p_range = f"₹{data['min_price']} se ₹{data['max_price']}"
+            note = data.get("advisory", "")
+
+        # Check if farmer also stated quantity
+        num, unit = self._extract_quantity(text)
+        if num:
+            session.raw_quantity_num = num
+            session.unit_type = unit
+            if unit in ["katta", "bori", "bag"]:
+                qtl = round((num * 50.0) / 100.0, 1)
+            elif unit == "ton":
+                qtl = round(num * 10.0, 1)
+            elif unit == "pickup":
+                qtl = round(num * 18.0, 1)
+            elif unit == "trolley":
+                qtl = round(num * 30.0, 1)
+            else:
+                qtl = float(num)
+            session.quantity_quintals = qtl
+
+            total_gross = int(qtl * rate)
+            spoken = (
+                f"{session.farmer_name} ji! {session.district or session.state} me {mandis} mandiyon me {hindi_name} ka taaza bhav lagbhag ₹{rate:,} prati quintal chal raha hai ({p_range}). "
+                f"Aapke {qtl} quintal maal ka andazan gross moolya lagbhag ₹{total_gross:,} rupaye banta hai! {note} "
+                f"Mandi le jaane ke liye gaadi aapki apni hai, ya tempo bhade par karenge?"
+            )
+            session.step = "AWAITING_TRANSPORT"
+        else:
+            spoken = (
+                f"{session.farmer_name} ji! {session.district or session.state} me {mandis} mandiyon me {hindi_name} ka taaza bhav lagbhag ₹{rate:,} prati quintal chal raha hai ({p_range}). {note} "
+                f"Aapke paas bechne ke liye lagbhag kitna maal hai—jaise kitne katte ya quintal?"
+            )
+            session.step = "AWAITING_QUANTITY"
+
+        return {
+            "spoken_text": spoken,
+            "step": session.step,
+            "data": {
+                "commodity": comm_key,
+                "hindi_name": hindi_name,
+                "benchmark_price": rate,
+                "range": p_range
+            }
+        }
+
+    def _handle_quantity_response(self, text: str, session: Any) -> Optional[Dict[str, Any]]:
+        num, unit = self._extract_quantity(text)
+        if num:
+            session.raw_quantity_num = num
+            session.unit_type = unit
+            if unit in ["katta", "bori", "bag"]:
+                qtl = round((num * 50.0) / 100.0, 1)
+            elif unit == "ton":
+                qtl = round(num * 10.0, 1)
+            elif unit == "pickup":
+                qtl = round(num * 18.0, 1)
+            elif unit == "trolley":
+                qtl = round(num * 30.0, 1)
+            else:
+                qtl = float(num)
+            session.quantity_quintals = qtl
+
+            own_words = ["apni", "apna", "bolero", "pickup", "tractor", "own", "meri", "khud ki", "अपनी", "अपना", "बोलेरो", "पिकअप", "ट्रैक्टर", "खुद की", "मेरी"]
+            hired_words = ["tempo", "bhada", "bhade", "rent", "kiraya", "chhota hathi", "टेंपो", "भाड़ा", "भाड़े", "किराया", "छोटा हाथी"]
+
+            if any(w in text for w in own_words):
+                session.has_own_vehicle = True
+                session.vehicle_name = "Own Vehicle"
+                from app.services.dialogue_manager import dialogue_manager
+                return dialogue_manager._compute_and_deliver_arbitrage(session)
+            elif any(w in text for w in hired_words):
+                session.has_own_vehicle = False
+                session.vehicle_name = "Hired Tempo"
+                from app.services.dialogue_manager import dialogue_manager
+                return dialogue_manager._compute_and_deliver_arbitrage(session)
+            else:
+                session.step = "AWAITING_TRANSPORT"
+                spoken = (
+                    f"Bahut badhiya {session.farmer_name} ji! Kul {qtl} quintal maal darj ho gaya hai. "
+                    f"Ab batayein, mandi le jaane ke liye gaadi aapki apni hai, ya tempo bhade par karenge?"
+                )
+                return {
+                    "spoken_text": spoken,
+                    "step": "AWAITING_TRANSPORT",
+                    "data": {"quantity_quintals": qtl}
+                }
+        return None
+
+    def _handle_transport_response(self, text: str, session: Any) -> Optional[Dict[str, Any]]:
+        own_words = ["apni", "apna", "bolero", "pickup", "tractor", "own", "meri", "khud ki", "अपनी", "अपना", "बोलेरो", "पिकअप", "ट्रैक्टर", "खुद की", "मेरी"]
+        hired_words = ["tempo", "bhada", "bhade", "rent", "kiraya", "chhota hathi", "टेंपो", "भाड़ा", "भाड़े", "किराया", "छोटा हाथी"]
+
+        if any(w in text for w in own_words):
+            session.has_own_vehicle = True
+            session.vehicle_name = "Own Vehicle"
+            from app.services.dialogue_manager import dialogue_manager
+            return dialogue_manager._compute_and_deliver_arbitrage(session)
+        elif any(w in text for w in hired_words):
+            session.has_own_vehicle = False
+            session.vehicle_name = "Hired Tempo"
+            from app.services.dialogue_manager import dialogue_manager
+            return dialogue_manager._compute_and_deliver_arbitrage(session)
         return None
 
     def _extract_quantity(self, text: str) -> Tuple[Optional[float], Optional[str]]:
-        match = re.search(r"(\d+(?:\.\d+)?)\s*(katta|katte|bori|boriyan|bag|bags|quintal|kuntal|qtl|ton|trolley|pickup|gadi)?", text)
+        pattern = r"(\d+(?:\.\d+)?)\s*(katta|katte|कट्टे|कट्टा|bori|boriyan|बोरी|बोरियां|bag|bags|बैग|quintal|kuntal|क्विंटल|कुंतल|qtl|ton|टन|trolley|ट्रॉली|ट्रोली|pickup|पिकअप|gadi|गाड़ी)?"
+        match = re.search(pattern, text)
         if match:
             num = float(match.group(1))
             unit = match.group(2) or "quintal"
-            unit_norm = "katta" if "katt" in unit else ("bori" if "bor" in unit else ("ton" if "ton" in unit else ("pickup" if "pickup" in unit else ("trolley" if "troll" in unit else "quintal"))))
+            if any(x in unit for x in ["katt", "कट्ट", "कट्टा"]):
+                unit_norm = "katta"
+            elif any(x in unit for x in ["bor", "बोर"]):
+                unit_norm = "bori"
+            elif any(x in unit for x in ["ton", "टन"]):
+                unit_norm = "ton"
+            elif any(x in unit for x in ["pickup", "पिकअप"]):
+                unit_norm = "pickup"
+            elif any(x in unit for x in ["troll", "ट्रॉली", "ट्रोली"]):
+                unit_norm = "trolley"
+            else:
+                unit_norm = "quintal"
             return num, unit_norm
         return None, None
 

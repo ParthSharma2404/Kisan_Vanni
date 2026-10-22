@@ -14,8 +14,9 @@ class SessionState:
         self.session_id = session_id
         self.phone_number: str = ""
         self.farmer_name: str = "Kisan Bhai"
-        self.district: str = "Nashik"
-        self.location_name: str = ""
+        self.state: Optional[str] = None
+        self.district: Optional[str] = None
+        self.location_name: Optional[str] = None
         self.lat: float = 20.0800
         self.lon: float = 74.1100
         self.location_confirmed: bool = False
@@ -28,7 +29,7 @@ class SessionState:
         
         self.has_own_vehicle: Optional[bool] = None
         self.vehicle_name: Optional[str] = None
-        self.step: str = "GREETING"
+        self.step: str = "ACTIVE"
         self.last_arbitrage_results: List[Dict[str, Any]] = []
         self.mandi_slip: Optional[Dict[str, Any]] = None
 
@@ -47,21 +48,20 @@ class DialogueManager:
 
     async def process_utterance(self, session_id: str, utterance: str) -> Dict[str, Any]:
         """
-        Process incoming farmer voice transcript with vernacular dialect reasoning.
-        Handles conversational profile onboarding, dynamic location confirmation,
-        barge-in interruptions, arbitrage calculations, eNAM rights, and background WhatsApp dispatch.
+        Streamlined, dynamic Indic conversational intelligence pipeline:
+        User Utterance (STT) -> Agri-Intelligence / Mandi Arbitrage -> Timbre Voice (TTS)
         """
         session = self.get_or_create_session(session_id)
         text = utterance.strip().lower()
 
-        # 1. Check for Direct WhatsApp Dispatch Request
+        # 1. Direct WhatsApp Dispatch Request
         if any(w in text for w in ["whatsapp", "sms", "message", "bhej do", "bhej", "parcha", "rasid", "bill", "pass", "slip"]):
             if session.last_arbitrage_results or session.mandi_slip:
                 slip = session.mandi_slip or self._generate_enhanced_slip(session)
                 session.mandi_slip = slip
                 best_name = session.last_arbitrage_results[0]["mandi_name"] if session.last_arbitrage_results else "Mandi"
                 
-                # Silent background WhatsApp dispatch via Baileys
+                # Silent background WhatsApp dispatch
                 dispatch_res = await self._dispatch_whatsapp_background(session.phone_number, slip.get("whatsapp_text", ""))
                 
                 spoken = (
@@ -81,223 +81,14 @@ class DialogueManager:
                     }
                 }
 
-        # 2. Check for Contextual / Barge-in Questions (Distance, Closest Mandi, Top Rate)
+        # 2. Check for Contextual Distance / Nearest Mandi Questions
         distance_query = self._handle_distance_or_mandi_query(session, text)
         if distance_query:
             return distance_query
 
-        # 3. Check for eNAM Specific Questions & Grievances
-        enam_answer = enam_advisor.get_advice_for_query(text)
-        if enam_answer:
-            return {
-                "spoken_text": enam_answer,
-                "step": session.step,
-                "data": {"enam_alert": True, "mandi_slip": session.mandi_slip, "evaluated_mandis": session.last_arbitrage_results}
-            }
+        # 3. Dynamic Sovereign Agri-Intelligence Engine (Location discovery, regional mandis, ICAR crop doctor, eNAM, schemes)
+        return agri_engine.analyze_and_respond(utterance, session)
 
-        # 4. Check for Crop Doctor / Symptoms
-        diagnosis = crop_doctor.diagnose(text)
-        if diagnosis:
-            session.step = "CROP_DOCTOR"
-            return {
-                "spoken_text": diagnosis["spoken_advice_hi"],
-                "step": "CROP_DOCTOR",
-                "data": {
-                    "disease_info": diagnosis,
-                    "mandi_slip": session.mandi_slip,
-                    "evaluated_mandis": session.last_arbitrage_results
-                }
-            }
-
-        # 5. CONVERSATIONAL ONBOARDING: First-time Farmer
-        if session.step == "ONBOARDING_PROFILE":
-            name, village = self._extract_name_and_location(text)
-            crop = self._extract_crop(text)
-            
-            if name or village:
-                final_name = name or "Kisan Bhai"
-                final_village = village or "Shivrajpur"
-                session.farmer_name = final_name
-                session.location_name = final_village
-                
-                # Save into database (Supabase + local SQLite fallback)
-                farmer_db.update_farmer_profile(
-                    phone_number=session.phone_number,
-                    name=final_name,
-                    village=final_village,
-                    district=session.district,
-                    primary_crops=[crop] if crop else ["Pyaaz", "Tamatar"]
-                )
-
-                if crop:
-                    session.commodity = crop
-                    session.step = "AWAITING_QUANTITY"
-                    rates = mandi_service.get_rates_for_commodity(crop, session.lat, session.lon, radius_km=85)
-                    top_rate = int(rates[0]["modal_price"]) if rates else 2400
-                    top_mandi = rates[0]["market"] if rates else "Lasalgaon"
-                    spoken = (
-                        f"Namaste {final_name} ji! Maine {final_village} darj kar liya hai. "
-                        f"Aaj {crop.capitalize()} ka bhav {top_mandi} me lagbhag ₹{top_rate} prati quintal chal raha hai. "
-                        f"Aapke paas bechne ke liye kitna maal hai—jaise kitne katte, bori ya quintal?"
-                    )
-                else:
-                    session.step = "AWAITING_CROP"
-                    spoken = (
-                        f"Namaste {final_name} ji! Maine aapka gaon {final_village} darj kar liya hai. "
-                        f"Aaj aap kaunsi fasal ka taaza mandi bhav aur sabse uncha munafa dekhna chahte hain—jaise Pyaaz, Tamatar ya Gehun?"
-                    )
-
-                return {
-                    "spoken_text": spoken,
-                    "step": session.step,
-                    "data": {"farmer_name": final_name, "village": final_village, "commodity": session.commodity}
-                }
-
-        # 6. CONVERSATIONAL ONBOARDING: Returning Farmer Location Confirmation
-        if session.step == "CONFIRMING_LOCATION":
-            crop = self._extract_crop(text)
-            if crop:
-                # Farmer bypassed location check and asked for crop directly
-                session.commodity = crop
-                session.location_confirmed = True
-                session.step = "AWAITING_QUANTITY"
-                rates = mandi_service.get_rates_for_commodity(crop, session.lat, session.lon, radius_km=85)
-                top_rate = int(rates[0]["modal_price"]) if rates else 2400
-                top_mandi = rates[0]["market"] if rates else "Lasalgaon"
-                spoken = (
-                    f"Ji {session.farmer_name} ji! {crop.capitalize()} ka bhav {top_mandi} mandi me lagbhag ₹{top_rate} prati quintal hai. "
-                    f"Aapke paas kitne katte ya quintal maal hai bechne ke liye?"
-                )
-                return {
-                    "spoken_text": spoken,
-                    "step": session.step,
-                    "data": {"commodity": crop, "rates": rates}
-                }
-
-            # Check if farmer confirmed existing location
-            if any(w in text for w in ["haan", "wahi", "wahin", "sahi", "bilkul", "yes", "ji haan", "theek hai"]):
-                session.location_confirmed = True
-                session.step = "AWAITING_CROP"
-                spoken = f"Bahut badhiya {session.farmer_name} ji! Aaj kaunsi fasal ka taaza mandi bhav dekhna chahte hain?"
-                return {
-                    "spoken_text": spoken,
-                    "step": session.step,
-                    "data": {"location_confirmed": True}
-                }
-
-            # Check if farmer changed location
-            if any(w in text for w in ["nahi", "badal", "abhi", "shifted", "mandi me", "se bol raha"]):
-                _, new_loc = self._extract_name_and_location(text)
-                if not new_loc:
-                    new_loc = self._extract_standalone_location(text) or "Nashik"
-                
-                session.location_name = new_loc
-                farmer_db.update_location(session.phone_number, village=new_loc, district="Nashik")
-                session.location_confirmed = True
-                session.step = "AWAITING_CROP"
-                spoken = f"Theek hai {session.farmer_name} ji, maine aapki nayi location {new_loc} update kar di hai. Ab batayein aaj kaunsi fasal bechni hai?"
-                return {
-                    "spoken_text": spoken,
-                    "step": session.step,
-                    "data": {"updated_location": new_loc}
-                }
-
-        # 7. Global Entity Extraction (Multi-intent / One-shot detection)
-        detected_crop = self._extract_crop(text)
-        if detected_crop:
-            session.commodity = detected_crop
-
-        num, unit = self._extract_quantity_and_unit(text)
-        if num:
-            session.raw_quantity_num = num
-            session.unit_type = unit
-            if unit in ["katta", "bori", "jali", "bag"]:
-                bag_wt = self._extract_bag_weight(text)
-                if bag_wt:
-                    session.bag_weight_kg = float(bag_wt)
-                    session.quantity_quintals = round((num * session.bag_weight_kg) / 100.0, 2)
-            elif unit == "trolley":
-                session.quantity_quintals = round(num * 30.0, 2)
-            elif unit == "pickup":
-                session.quantity_quintals = round(num * 18.0, 2)
-            elif unit == "ton":
-                session.quantity_quintals = round(num * 10.0, 2)
-            elif unit == "man":
-                session.quantity_quintals = round(num * 0.4, 2)
-            else:
-                session.quantity_quintals = float(num)
-
-        vehicle_res = self._extract_vehicle(text)
-        if vehicle_res is not None:
-            has_own, v_name = vehicle_res
-            session.has_own_vehicle = has_own
-            session.vehicle_name = v_name
-
-        # 8. Progressive Discovery: If all 3 entities are present, calculate Arbitrage immediately!
-        if session.commodity and session.quantity_quintals and (session.has_own_vehicle is not None):
-            return self._compute_and_deliver_arbitrage(session)
-
-        # Step B: Awaiting Bag Weight
-        if session.step == "AWAITING_BAG_WEIGHT":
-            bag_wt = self._extract_bag_weight(text)
-            session.bag_weight_kg = float(bag_wt) if bag_wt else 50.0
-
-            total_kg = (session.raw_quantity_num or 20.0) * session.bag_weight_kg
-            session.quantity_quintals = round(total_kg / 100.0, 2)
-            session.step = "AWAITING_TRANSPORT"
-            spoken = (
-                f"Bahut khoob! Kul mila kar aapka {session.quantity_quintals} quintal maal hua. "
-                f"Ab batayein, mandi le jaane ke liye gaadi aapki apni hai, ya tempo bhade par karenge?"
-            )
-            return {
-                "spoken_text": spoken,
-                "step": session.step,
-                "data": {
-                    "bag_weight_kg": session.bag_weight_kg,
-                    "quantity_quintals": session.quantity_quintals,
-                    "commodity": session.commodity
-                }
-            }
-
-        # Step C: Transport Discovery & Net Arbitrage
-        elif session.step == "AWAITING_TRANSPORT":
-            vehicle_res = self._extract_vehicle(text)
-            if vehicle_res is not None:
-                has_own, v_name = vehicle_res
-                session.has_own_vehicle = has_own
-                session.vehicle_name = v_name
-            else:
-                session.has_own_vehicle = True
-                session.vehicle_name = "Own Vehicle"
-            return self._compute_and_deliver_arbitrage(session)
-
-        # Step D: Post-Arbitrage Follow-up
-        elif session.step == "ARBITRAGE_DELIVERED":
-            if any(w in text for w in ["whatsapp", "bhej", "parcha", "slip", "rasid"]):
-                pass  # handled in direct whatsapp check
-            else:
-                return agri_engine.analyze_and_respond(utterance, session)
-
-        # 9. Sovereign Agri-Intelligence Engine (All Indian commodities, crop doctor, fertilizer, schemes, eNAM, weather)
-        agri_res = agri_engine.analyze_and_respond(utterance, session)
-        if agri_res.get("step") == "OPEN_CONVERSATION":
-            try:
-                from app.services.llm_service import llm_service
-                llm_reply = await llm_service.generate_response(
-                    user_query=utterance,
-                    farmer_name=session.farmer_name,
-                    village=session.location_name,
-                    district=session.district,
-                    crops=[session.commodity] if session.commodity else None
-                )
-                if llm_reply and len(llm_reply.strip()) > 5:
-                    agri_res["spoken_text"] = llm_reply.strip()
-                    if "data" not in agri_res:
-                        agri_res["data"] = {}
-                    agri_res["data"]["generated_by_evon"] = True
-            except Exception as e:
-                print(f"[DialogueManager:LLM] Evon fallback: {e}")
-        return agri_res
 
     async def _dispatch_whatsapp_background(self, phone: str, message_text: str) -> Dict[str, Any]:
         """Silent background WhatsApp delivery via Baileys microservice."""
