@@ -16,7 +16,10 @@ from typing import Tuple
 try:
     import audioop
 except ImportError:
-    import audioop_lts as audioop
+    try:
+        import audioop_lts as audioop
+    except ImportError:
+        audioop = None
 
 
 class AcousticDSPEngine:
@@ -37,7 +40,7 @@ class AcousticDSPEngine:
         3. Noise Gate (squelches ambient mandi babble below threshold)
         4. Dynamic Peak Normalization (boosts clear speech for higher Gnani STT accuracy)
         """
-        if not wav_bytes or len(wav_bytes) < 44:
+        if not wav_bytes or len(wav_bytes) < 44 or not audioop:
             return wav_bytes
 
         try:
