@@ -57,28 +57,23 @@ class AcousticDSPEngine:
 
             # 1. Calculate RMS energy
             rms = audioop.rms(raw_pcm, sampwidth)
-            if rms < 30:
+            if rms < 25:
                 # Essentially pure silence, return as is
                 return wav_bytes
 
-            # Adapt noise floor slowly
-            self.noise_floor = self.noise_floor * 0.95 + min(rms, 300) * 0.05
+            # 2. DC-offset removal and mild high-pass filter (cuts low tractor rumble & wind pop)
+            try:
+                cleaned_pcm = self._apply_highpass_filter(raw_pcm, alpha=0.92)
+            except Exception:
+                cleaned_pcm = raw_pcm
 
-            # 2. DC-offset removal and mild high-pass filter using single-pole difference
-            # y[n] = x[n] - x[n-1] + alpha * y[n-1]  (alpha ~ 0.95 corresponds to ~120Hz cutoff at 16kHz)
-            cleaned_pcm = self._apply_highpass_filter(raw_pcm, alpha=0.94)
-
-            # 3. Dynamic Noise Gate / Squelch:
-            # If overall RMS is barely above the ambient noise floor, attenuate heavily
-            snr = 20 * math.log10(max(rms, 1) / max(self.noise_floor, 1))
-            if snr < 4.0:
-                # Very weak speech submerged in noise: attenuate background
-                cleaned_pcm = audioop.mul(cleaned_pcm, sampwidth, 0.3)
-            else:
-                # 4. Peak Normalization: scale up speech so Gnani Prisma receives clean, confident signal
-                max_val = audioop.max(cleaned_pcm, sampwidth)
-                if max_val > 500 and max_val < 22000 and normalize_gain:
-                    factor = min(3.0, 24000.0 / max_val)
+            # 3. Voice Energy Normalization (AGC):
+            # Scale up speech so Gnani Prisma receives crisp, confident signal regardless of mic distance
+            max_val = audioop.max(cleaned_pcm, sampwidth)
+            if max_val > 100 and normalize_gain:
+                # Target clean speech headroom without clipping
+                factor = min(3.5, 22000.0 / max(max_val, 1))
+                if factor > 1.05:
                     cleaned_pcm = audioop.mul(cleaned_pcm, sampwidth, factor)
 
             # Re-encode to clean WAV

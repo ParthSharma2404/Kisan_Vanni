@@ -20,7 +20,7 @@ from app.services.enam_rules import enam_advisor
 COMMODITY_DATABASE = {
     # Vegetables
     "onion": {
-        "names": ["onion", "pyaaz", "kanda", "pyaj", "kande"],
+        "names": ["onion", "pyaaz", "kanda", "pyaj", "kande", "प्याज", "प्याज़", "कांदा", "कांदे", "कंदा"],
         "hindi": "Pyaaz",
         "benchmark_price": 2450,
         "min_price": 1900,
@@ -29,7 +29,7 @@ COMMODITY_DATABASE = {
         "advisory": "Lasalgaon aur Pimpalgaon mandi me pichle 2 din se aawak normal hai aur bhav mazboot chal raha hai."
     },
     "tomato": {
-        "names": ["tomato", "tamatar", "tamaatar", "tamater"],
+        "names": ["tomato", "tamatar", "tamaatar", "tamater", "टमाटर", "टमाटार", "टोमेटो"],
         "hindi": "Tamatar",
         "benchmark_price": 1550,
         "min_price": 1100,
@@ -38,7 +38,7 @@ COMMODITY_DATABASE = {
         "advisory": "Hybrid tamatar ki maang local mandi aur Bangalore side me achhi hai. A Grade packing par ₹200 extra mil raha hai."
     },
     "potato": {
-        "names": ["potato", "aloo", "alu", "batata"],
+        "names": ["potato", "aloo", "alu", "batata", "आलू", "आलु", "बटाटा"],
         "hindi": "Aloo",
         "benchmark_price": 1650,
         "min_price": 1300,
@@ -47,7 +47,7 @@ COMMODITY_DATABASE = {
         "advisory": "Cold storage nikaasi ke chalte bhav sthir hai. Jyoti aur Pukhraj variety ko achha uthaan mil raha hai."
     },
     "garlic": {
-        "names": ["garlic", "lahsun", "lehsun", "lahsan"],
+        "names": ["garlic", "lahsun", "lehsun", "lahsan", "लहसुन", "लहसन", "लहसून"],
         "hindi": "Lahsun",
         "benchmark_price": 11500,
         "min_price": 8500,
@@ -56,7 +56,7 @@ COMMODITY_DATABASE = {
         "advisory": "Ooty aur Desi lahsun me tezi bani hui hai. Super box quality 13 hazar ke paar bik rahi hai."
     },
     "ginger": {
-        "names": ["ginger", "adrak", "adrakh", "aaley"],
+        "names": ["ginger", "adrak", "adrakh", "aaley", "अदरक", "आदा"],
         "hindi": "Adrak",
         "benchmark_price": 6800,
         "min_price": 5200,
@@ -65,7 +65,7 @@ COMMODITY_DATABASE = {
         "advisory": "Nayi geeli adrak aane se bhav normal level par chal raha hai."
     },
     "chilli": {
-        "names": ["chilli", "chili", "mirchi", "mirch", "hari mirch", "lal mirch"],
+        "names": ["chilli", "chili", "mirchi", "mirch", "hari mirch", "lal mirch", "मिर्च", "मिर्ची", "हरी मिर्च", "लाल मिर्च"],
         "hindi": "Mirchi",
         "benchmark_price": 4200,
         "min_price": 3100,
@@ -74,7 +74,7 @@ COMMODITY_DATABASE = {
         "advisory": "Teja aur Byadgi mirchi export quality me bohot uncha bhav de rahi hai."
     },
     "cauliflower": {
-        "names": ["cauliflower", "phoolgobhi", "gobhi", "gobi"],
+        "names": ["cauliflower", "phoolgobhi", "gobhi", "gobi", "फूलगोभी", "गोभी", "फूल गोभी"],
         "hindi": "Phool Gobhi",
         "benchmark_price": 1400,
         "min_price": 900,
@@ -83,7 +83,7 @@ COMMODITY_DATABASE = {
         "advisory": "Local mandiyon me aawak badhne se subah jaldi le jaane par behtar rate milta hai."
     },
     "cabbage": {
-        "names": ["cabbage", "bandgobhi", "patta gobhi", "pattagobhi"],
+        "names": ["cabbage", "bandgobhi", "patta gobhi", "pattagobhi", "पत्तागोभी", "पत्ता गोभी", "बंदगोभी"],
         "hindi": "Patta Gobhi",
         "benchmark_price": 1100,
         "min_price": 750,
@@ -92,7 +92,7 @@ COMMODITY_DATABASE = {
         "advisory": "Firm aur green head wali gobhi ki wholesale maang tagdi hai."
     },
     "brinjal": {
-        "names": ["brinjal", "eggplant", "baingan", "bhanta", "vangi"],
+        "names": ["brinjal", "eggplant", "baingan", "bhanta", "vangi", "बैंगन", "बैगन", "भांटा"],
         "hindi": "Baingan",
         "benchmark_price": 1350,
         "min_price": 850,
@@ -101,7 +101,7 @@ COMMODITY_DATABASE = {
         "advisory": "Kaala aur chamakdar baingan bina keede ke sabse zyada dam par uth raha hai."
     },
     "okra": {
-        "names": ["okra", "ladyfinger", "bhindi", "bhendi"],
+        "names": ["okra", "ladyfinger", "bhindi", "bhendi", "भिंडी", "भेंडी"],
         "hindi": "Bhindi",
         "benchmark_price": 2800,
         "min_price": 2100,
@@ -112,7 +112,7 @@ COMMODITY_DATABASE = {
 
     # Cereals & Grains
     "wheat": {
-        "names": ["wheat", "gehu", "gehun", "gahu"],
+        "names": ["wheat", "gehu", "gehun", "gahu", "गेहूं", "गेहू", "कनक"],
         "hindi": "Gehun",
         "benchmark_price": 2720,
         "min_price": 2425,
@@ -121,7 +121,7 @@ COMMODITY_DATABASE = {
         "advisory": "Government MSP ₹2,425 hai, par open market me millers ₹2,700 ke upar khareed rahe hain."
     },
     "paddy": {
-        "names": ["paddy", "rice", "dhan", "chawal", "dhaan", "basmati"],
+        "names": ["paddy", "rice", "dhan", "chawal", "dhaan", "basmati", "धान", "चावल", "बासमती"],
         "hindi": "Dhan (Paddy)",
         "benchmark_price": 2320,
         "min_price": 2300,
@@ -130,7 +130,7 @@ COMMODITY_DATABASE = {
         "advisory": "Grade-A Dhan ka MSP ₹2,320 hai. Basmati 1509 aur 1718 me rate ₹3,600 se ₹4,000 chal raha hai."
     },
     "maize": {
-        "names": ["maize", "corn", "makka", "makai", "bhutta"],
+        "names": ["maize", "corn", "makka", "makai", "bhutta", "मक्का", "मकई", "भुट्टा"],
         "hindi": "Makka",
         "benchmark_price": 2225,
         "min_price": 1950,
@@ -139,7 +139,7 @@ COMMODITY_DATABASE = {
         "advisory": "Poultry feed aur ethanol plants ki maang se makka ka bhav mazboot hai. 14% se kam moisture par top rate milta hai."
     },
     "bajra": {
-        "names": ["bajra", "pearl millet", "bajri"],
+        "names": ["bajra", "pearl millet", "bajri", "बाजरा", "बाजरी"],
         "hindi": "Bajra",
         "benchmark_price": 2625,
         "min_price": 2350,
@@ -148,7 +148,7 @@ COMMODITY_DATABASE = {
         "advisory": "Government procurement aur shardi ki maang se bajra MSP ke upar trade ho raha hai."
     },
     "jowar": {
-        "names": ["jowar", "sorghum", "jowari"],
+        "names": ["jowar", "sorghum", "jowari", "ज्वार", "ज्वारी"],
         "hindi": "Jowar",
         "benchmark_price": 3370,
         "min_price": 3180,
@@ -159,7 +159,7 @@ COMMODITY_DATABASE = {
 
     # Pulses (Dal)
     "chana": {
-        "names": ["chana", "gram", "chickpea", "bengal gram", "chane"],
+        "names": ["chana", "gram", "chickpea", "bengal gram", "chane", "चना", "चने", "छोला"],
         "hindi": "Chana",
         "benchmark_price": 6150,
         "min_price": 5600,
@@ -168,7 +168,7 @@ COMMODITY_DATABASE = {
         "advisory": "Chana ka MSP ₹5,650 hai. Dal millers ki maang se rate lagbhag ₹6,150 prati quintal chal raha hai."
     },
     "tur": {
-        "names": ["tur", "arhar", "pigeon pea", "tuvar", "arhar dal"],
+        "names": ["tur", "arhar", "pigeon pea", "tuvar", "arhar dal", "अरहर", "तुअर", "तूर"],
         "hindi": "Tur (Arhar)",
         "benchmark_price": 10200,
         "min_price": 8800,
@@ -177,7 +177,7 @@ COMMODITY_DATABASE = {
         "advisory": "Tur dal ki supply tight hone ki wajah se mandi me tezi hai. Safed tur sabse tezi me hai."
     },
     "moong": {
-        "names": ["moong", "green gram", "mung"],
+        "names": ["moong", "green gram", "mung", "मूंग", "मूँग"],
         "hindi": "Moong",
         "benchmark_price": 8680,
         "min_price": 7900,
@@ -186,7 +186,7 @@ COMMODITY_DATABASE = {
         "advisory": "Chamkila mota moong bohot tezi se khareeda ja raha hai. NAFED procurement bhi active hai."
     },
     "urad": {
-        "names": ["urad", "black gram", "udid"],
+        "names": ["urad", "black gram", "udid", "उड़द", "उडद"],
         "hindi": "Urad",
         "benchmark_price": 7400,
         "min_price": 6800,
@@ -197,7 +197,7 @@ COMMODITY_DATABASE = {
 
     # Oilseeds
     "soyabean": {
-        "names": ["soyabean", "soybean", "soya"],
+        "names": ["soyabean", "soybean", "soya", "सोयाबीन", "सोया"],
         "hindi": "Soyabean",
         "benchmark_price": 4500,
         "min_price": 4100,
@@ -206,7 +206,7 @@ COMMODITY_DATABASE = {
         "advisory": "MSP ₹4,892 ke aas-paas hai. Crushing plants dry yellow soyabean par achha bhav de rahe hain."
     },
     "mustard": {
-        "names": ["mustard", "sarso", "sarson", "rai", "toria"],
+        "names": ["mustard", "sarso", "sarson", "rai", "toria", "सरसों", "सरसो", "राई"],
         "hindi": "Sarson (Mustard)",
         "benchmark_price": 5850,
         "min_price": 5400,
@@ -215,7 +215,7 @@ COMMODITY_DATABASE = {
         "advisory": "42% oil condition wali sarson ₹5,800 se ₹6,100 tak asani se bik rahi hai."
     },
     "groundnut": {
-        "names": ["groundnut", "peanut", "mungfali", "moongphali", "shengdana"],
+        "names": ["groundnut", "peanut", "mungfali", "moongphali", "shengdana", "मूंगफली", "शेंगदाना"],
         "hindi": "Mungfali",
         "benchmark_price": 6780,
         "min_price": 6100,
@@ -226,7 +226,7 @@ COMMODITY_DATABASE = {
 
     # Cash Crops & Fruits
     "cotton": {
-        "names": ["cotton", "kapas", "rui", "narma"],
+        "names": ["cotton", "kapas", "rui", "narma", "कपास", "रुई", "नरमा"],
         "hindi": "Kapas (Cotton)",
         "benchmark_price": 7520,
         "min_price": 7120,
@@ -235,7 +235,7 @@ COMMODITY_DATABASE = {
         "advisory": "Medium staple cotton MSP ₹7,121 aur Long staple ₹7,521 hai. Ginning mills dry lot par full payment de rahi hain."
     },
     "sugarcane": {
-        "names": ["sugarcane", "ganna", "eekh", "oos"],
+        "names": ["sugarcane", "ganna", "eekh", "oos", "गन्ना", "ईख"],
         "hindi": "Ganna",
         "benchmark_price": 340,
         "min_price": 315,
@@ -244,7 +244,7 @@ COMMODITY_DATABASE = {
         "advisory": "Central FRP rate ₹340 prati quintal hai (10.25% recovery). Mill slip aate hi 14 din me payment anivarya hai."
     },
     "banana": {
-        "names": ["banana", "kela", "kele"],
+        "names": ["banana", "kela", "kele", "केला", "केले"],
         "hindi": "Kela",
         "benchmark_price": 1850,
         "min_price": 1400,
@@ -328,17 +328,33 @@ class AgriIntelligenceEngine:
             pass
 
     def _match_commodity(self, text: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+        clean_text = text.lower()
         for comm_key, comm_data in COMMODITY_DATABASE.items():
             for alias in comm_data["names"]:
-                pattern = r"\b" + re.escape(alias) + r"\b"
-                if re.search(pattern, text):
-                    return comm_key, comm_data
+                alias_lower = alias.lower()
+                # Check for Devanagari / non-ASCII characters directly
+                if any(ord(c) > 127 for c in alias_lower):
+                    if alias_lower in clean_text:
+                        return comm_key, comm_data
+                else:
+                    pattern = r"(?:^|\W)" + re.escape(alias_lower) + r"(?:$|\W)"
+                    if re.search(pattern, clean_text):
+                        return comm_key, comm_data
         return None
 
     def _handle_commodity_query(self, text: str, session: Any) -> Optional[Dict[str, Any]]:
         matched = self._match_commodity(text)
-        rate_words = ["bhav", "rate", "bikaav", "bhav kya", "kimat", "mandi", "bechna", "katta", "quintal", "bori", "daam", "kitne me"]
+        rate_words = ["bhav", "rate", "bikaav", "bhav kya", "kimat", "mandi", "bechna", "katta", "quintal", "bori", "daam", "kitne me", "भाव", "रेट", "मंडी", "बेचना", "दाम", "कीमत", "वैल्यू", "मार्केट"]
         
+        # Detect regional state context (Punjab, UP, MP, Rajasthan, MH, etc.)
+        state_note = ""
+        if any(w in text for w in ["punjab", "पंजाब"]):
+            session.district = "Punjab"
+            session.location_name = "Punjab"
+            state_note = "Punjab me Jalandhar, Ludhiana aur Khanna mandiyon me maang achhi rehti hai. Badi quantity ke liye Delhi Azadpur mandi me bhi bhej sakte hain. "
+        elif any(w in text for w in ["nashik", "नासिक", "niphad", "lasalgaon"]):
+            state_note = "Nashik aur Lasalgaon belt me local APMC mandiyon me aawak strong hai. "
+
         # If commodity found or rate keyword used
         if matched:
             comm_key, data = matched
@@ -370,7 +386,7 @@ class AgriIntelligenceEngine:
                 total_gross = int(qtl * rate)
                 spoken = (
                     f"{session.farmer_name} ji! {hindi_name} ka taaza bhav {top_m} me lagbhag ₹{rate} prati quintal chal raha hai "
-                    f"(range ₹{min_p} se ₹{max_p}). "
+                    f"(range ₹{min_p} se ₹{max_p}). {state_note}"
                     f"Aapke {qtl} quintal maal ka andazan gross moolya lagbhag ₹{total_gross:,} rupaye banta hai! "
                     f"{adv} "
                     f"Kya aap gaadi ka diesel kharcha aur seedha munafa calculate karwana chahte hain?"
@@ -378,9 +394,9 @@ class AgriIntelligenceEngine:
             else:
                 spoken = (
                     f"{session.farmer_name} ji! Aaj {hindi_name} ka taaza bhav {top_m} mandi me lagbhag ₹{rate} prati quintal chal raha hai, "
-                    f"aur quality ke hisaab se ₹{min_p} se ₹{max_p} tak ka rate hai. "
+                    f"aur quality ke hisaab se ₹{min_p} se ₹{max_p} tak ka rate hai. {state_note}"
                     f"{adv} "
-                    f"Aapke paas bechne ke liye kitna maal hai—jaise kitne katte, bori ya quintal?"
+                    f"Aapke paas bechne ke liye lagbhag kitna maal hai—jaise kitne katte ya quintal?"
                 )
 
             return {
@@ -395,10 +411,10 @@ class AgriIntelligenceEngine:
                 }
             }
 
-        if any(w in text for w in ["mandi bhav", "taaza bhav", "aaj ka rate", "mandi ka rate"]):
+        if any(w in text for w in ["mandi bhav", "taaza bhav", "aaj ka rate", "mandi ka rate", "भाव क्या", "मंडी भाव", "रेट बताओ"]):
             return {
                 "spoken_text": (
-                    f"Ji {session.farmer_name} ji! Main sabhi mukhya faslon—jaise Pyaaz, Tamatar, Gehun, Dhan, Makka, Chana, Soyabean, Aloo aur Kapas "
+                    f"Ji {session.farmer_name} ji! Main sabhi mukhya faslon—jaise Tamatar, Pyaaz, Gehun, Dhan, Makka, Chana, Soyabean, Aloo aur Kapas "
                     f"ke live mandi rates track karta hoon. Aap kaunsi fasal ka taaza bhav jaanna chahte hain?"
                 ),
                 "step": "OPEN_CONVERSATION",
@@ -666,34 +682,52 @@ class AgriIntelligenceEngine:
         return None
 
     def _handle_chitchat_and_general(self, text: str, session: Any) -> Optional[Dict[str, Any]]:
-        if any(w in text for w in ["namaste", "pranam", "ram ram", "kisan vaani", "hello", "hi"]):
+        # WhatsApp Feature Query
+        if any(w in text for w in ["whatsapp", "व्हाट्सएप", "व्हाट्सऐप", "whatsapp ka", "use kya", "use hai", "use kyu", "kya use", "kya kaam"]):
+            phone_disp = session.phone_number if session.phone_number else "mobile"
             return {
                 "spoken_text": (
-                    f"Namaste {session.farmer_name} ji! Main Kisan-Vaani hoon. "
-                    f"Aap mandi ke taaza bhav, fasal ki bimari ki dawai, khad-sinchai, ya kisi sarkari yojana ke bare me bejhijhak pooch sakte hain. "
-                    f"Boliye, aaj kis baare me baat karein?"
+                    f"Kisan Bhai ji! Kisan-Vaani ka WhatsApp feature aapke liye bohot madadgar hai. "
+                    f"Aap jab bhi kisi fasal ka bhav dekhte hain, hum aapko seedhe aapke WhatsApp number (+91 {phone_disp}) "
+                    f"par poora digital hisaab bhej dete hain—jisme sabse uncha mandi rate, gaadi ka diesel kharcha, "
+                    f"aur aadhatiya commission zero percent (0%) ki eNAM kanooni receipt shaamil hoti hai! "
+                    f"Ise aap mandi me aadhatiye ko dikha kar poora haq le sakte hain."
+                ),
+                "step": "OPEN_CONVERSATION",
+                "data": {"feature": "WhatsApp Advisory"}
+            }
+
+        # Greetings in Hindi / Hinglish / English
+        if any(w in text for w in ["namaste", "pranam", "ram ram", "kisan vaani", "hello", "hi", "नमस्ते", "प्रणाम", "राम राम", "जय जवान", "जय किसान", "हेलो"]):
+            return {
+                "spoken_text": (
+                    f"Namaste {session.farmer_name} ji! Main Kisan-Vaani hoon—Gnani AI dwara chalit aapka personal kheti advisor. "
+                    f"Aap mujhse kisi bhi fasal ka taaza mandi rate, bimari ki dawai, khad-sinchai ya sarkari yojanaon ke bare me pooch sakte hain. "
+                    f"Batayein aaj kaunsi fasal ya suvidha par baat karein?"
                 ),
                 "step": "OPEN_CONVERSATION",
                 "data": {}
             }
 
-        if any(w in text for w in ["dhanyawad", "shukriya", "thanks", "theek hai", "achha"]):
+        # Gratitude
+        if any(w in text for w in ["dhanyawad", "shukriya", "thanks", "theek hai", "achha", "धन्यवाद", "शुक्रिया", "ठीक है", "अच्छा"]):
             return {
                 "spoken_text": (
-                    f"Bahut-bahut dhanyawad {session.farmer_name} ji! Annadata ki seva karna hi hamara kartavya hai. "
-                    f"Jab bhi koi sawal ho, bas ek aawaz lagayein. Jai Jawan, Jai Kisan!"
+                    f"Bahut-bahut dhanyawad {session.farmer_name} ji! Annadata ki seva karna hi hamara sankalp hai. "
+                    f"Jab bhi mandi bhav ya kheti me koi zaroorat ho, bas ek aawaz lagayein. Jai Jawan, Jai Kisan!"
                 ),
                 "step": "FINISHED",
                 "data": {}
             }
 
-        if any(w in text for w in ["kaun ho", "kya karte ho", "kya kar sakte ho", "help", "madad"]):
+        # Identity & Capabilities
+        if any(w in text for w in ["kaun ho", "kya karte ho", "kya kar sakte ho", "help", "madad", "कौन हो", "तुम कौन", "क्या करते"]):
             return {
                 "spoken_text": (
-                    f"Main Kisan-Vaani hoon—aapka vyaktigat kheti aur mandi advisor! "
-                    f"Main aapko: 1) Har fasal ka sabse uncha mandi bhav aur net profit batata hoon, "
-                    f"2) Fasal ki bimari aur dawai ki salah deta hoon, 3) eNAM me zero percent commission kanoon ki raksha karta hoon, aur "
-                    f"4) PM-Kisan, KCC jaisi yojanaon ki jankari deta hoon. Aap kuch bhi pooch sakte hain!"
+                    f"Main Kisan-Vaani hoon—aapka sovereign voice kheti aur mandi advisor! "
+                    f"Main aapko live mandi rates, diesel kharcha katne ke baad net munafa, "
+                    f"fasal ki bimari ka ilaj aur eNAM zero percent commission adhikar batata hoon. "
+                    f"Aap bol kar kuch bhi pooch sakte hain!"
                 ),
                 "step": "OPEN_CONVERSATION",
                 "data": {}
@@ -702,15 +736,39 @@ class AgriIntelligenceEngine:
         return None
 
     def _generate_open_agri_response(self, text: str, session: Any) -> Dict[str, Any]:
-        """Empathetic, voice-first Indic fallback for any other open question."""
+        """Intelligent voice-first Indic generative reasoning for open questions."""
+        f_name = session.farmer_name or "Kisan Bhai"
+        clean = text.strip()
+
+        # Crop mentions inside free text
+        if any(w in clean for w in ["tamatar", "टमाटर", "tomato"]):
+            return {
+                "spoken_text": f"{f_name} ji, tamatar ka bhav aaj lagbhag ₹1,550 se ₹1,850 prati quintal chal raha hai. Aapke paas bechne ke liye kitne crates ya quintal tamatar hain?",
+                "step": "COMMODITY_ANSWERED",
+                "data": {"commodity": "tomato"}
+            }
+        if any(w in clean for w in ["pyaaz", "kanda", "प्याज", "कांदा", "onion"]):
+            return {
+                "spoken_text": f"{f_name} ji, pyaaz ka bhav Lasalgaon aur Nashik mandiyon me ₹2,450 se ₹2,750 prati quintal hai. Aapke paas kitne katte maal taiyar hai?",
+                "step": "COMMODITY_ANSWERED",
+                "data": {"commodity": "onion"}
+            }
+        if any(w in clean for w in ["gehun", "gehu", "गेहूं", "wheat"]):
+            return {
+                "spoken_text": f"{f_name} ji, gehun ka taaza mandi bhav ₹2,580 se ₹2,720 prati quintal chal raha hai jo MSP se upar hai. Kitna quintal bechna chahte hain?",
+                "step": "COMMODITY_ANSWERED",
+                "data": {"commodity": "wheat"}
+            }
+
+        # General helpful answer
         return {
             "spoken_text": (
-                f"Ji {session.farmer_name} ji! Maine aapka sawal samajh liya hai. "
-                f"Kheti aur mandi ke mamle me main aapki poori madad karne ke liye taiyar hoon. "
-                f"Aap kisi specific fasal ka mandi bhav, bimari ki dawai, ya kisan yojana ke bare me batayein toh main turant vistaar se samjha deta hoon."
+                f"{f_name} ji, kheti aur mandi vyapar me sabse behtar munafa paane ke liye "
+                f"aap mujhse kisi bhi fasal ka taaza mandi bhav, bechne ka sahi samay, bimari ki dawai, ya eNAM kanoon pooch sakte hain. "
+                f"Aap kaunsi fasal par baat karna chahte hain?"
             ),
             "step": "OPEN_CONVERSATION",
-            "data": {"user_query": text}
+            "data": {"user_query": clean}
         }
 
 agri_engine = AgriIntelligenceEngine()

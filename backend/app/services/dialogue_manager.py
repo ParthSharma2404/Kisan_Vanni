@@ -339,7 +339,10 @@ class DialogueManager:
                 location = candidate_loc.capitalize()
 
         # Fallback keyword checks
-        common_places = ["Shivrajpur", "Niphad", "Nashik", "Lasalgaon", "Pimpalgaon", "Sinnar", "Yeola", "Dindori", "Bareilly", "Pune", "Kalwan"]
+        common_places = [
+            "Shivrajpur", "Niphad", "Nashik", "Lasalgaon", "Pimpalgaon", "Sinnar", "Yeola", "Dindori", "Bareilly", "Pune", "Kalwan",
+            "Punjab", "पंजाब", "Maharashtra", "महाराष्ट्र", "Haryana", "हरियाणा", "Rajasthan", "राजस्थान", "Madhya Pradesh", "MP", "UP", "Uttar Pradesh", "उत्तर प्रदेश", "Delhi", "दिल्ली"
+        ]
         for p in common_places:
             if p.lower() in text:
                 location = p
@@ -350,13 +353,16 @@ class DialogueManager:
             words = [w for w in text.split() if len(w) > 2 and w.lower() not in ["namaste", "bhaiya", "mera", "naam", "gaon", "se", "hoon", "aur", "hai"]]
             if words:
                 first = words[0].capitalize()
-                if first not in ["Pyaaz", "Tamatar", "Gehun", "Kanda"]:
+                if first not in ["Pyaaz", "Tamatar", "Gehun", "Kanda", "Punjab"]:
                     name = first
 
         return name, location
 
     def _extract_standalone_location(self, text: str) -> Optional[str]:
-        common_places = ["Shivrajpur", "Niphad", "Nashik", "Lasalgaon", "Pimpalgaon", "Sinnar", "Yeola", "Dindori", "Bareilly", "Pune", "Kalwan"]
+        common_places = [
+            "Shivrajpur", "Niphad", "Nashik", "Lasalgaon", "Pimpalgaon", "Sinnar", "Yeola", "Dindori", "Bareilly", "Pune", "Kalwan",
+            "Punjab", "पंजाब", "Maharashtra", "महाराष्ट्र", "Haryana", "हरियाणा", "Rajasthan", "राजस्थान", "Madhya Pradesh", "MP", "UP", "Uttar Pradesh", "उत्तर प्रदेश", "Delhi", "दिल्ली"
+        ]
         for p in common_places:
             if p.lower() in text:
                 return p
@@ -541,15 +547,24 @@ class DialogueManager:
     def _extract_crop(self, text: str) -> Optional[str]:
         crops = {
             "pyaaz": "onion", "kanda": "onion", "pyaj": "onion", "onion": "onion", "dungri": "onion",
+            "प्याज": "onion", "प्याज़": "onion", "कांदा": "onion", "कांदे": "onion",
             "tamatar": "tomato", "tomato": "tomato", "tamaatar": "tomato",
+            "टमाटर": "tomato", "टमाटार": "tomato", "टोमेटो": "tomato",
             "gehun": "wheat", "gehu": "wheat", "wheat": "wheat", "lokwan": "wheat",
-            "soyabean": "soyabean", "soya": "soyabean", "soybean": "soyabean",
-            "kapas": "cotton", "cotton": "cotton", "rui": "cotton",
-            "makka": "corn", "corn": "corn", "bhutta": "corn"
+            "गेहूं": "wheat", "गेहू": "wheat",
+            "aloo": "potato", "potato": "potato", "आलू": "potato", "आलु": "potato",
+            "soyabean": "soyabean", "soya": "soyabean", "soybean": "soyabean", "सोयाबीन": "soyabean",
+            "kapas": "cotton", "cotton": "cotton", "rui": "cotton", "कपास": "cotton",
+            "makka": "corn", "corn": "corn", "bhutta": "corn", "मक्का": "corn",
+            "chana": "chana", "चना": "chana", "sarso": "mustard", "सरसों": "mustard"
         }
         for word, crop_name in crops.items():
-            if re.search(r"\b" + re.escape(word) + r"\b", text) or word in text:
-                return crop_name
+            if any(ord(c) > 127 for c in word):
+                if word in text:
+                    return crop_name
+            else:
+                if re.search(r"(?:^|\W)" + re.escape(word) + r"(?:$|\W)", text) or word in text:
+                    return crop_name
         return None
 
     def _extract_quantity_and_unit(self, text: str) -> Tuple[Optional[float], Optional[str]]:

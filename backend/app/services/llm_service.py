@@ -141,11 +141,11 @@ class LLMService:
             loop = asyncio.get_running_loop()
             res = await asyncio.wait_for(
                 loop.run_in_executor(None, self._predict_evon_sync, full_prompt, sys_prompt),
-                timeout=12.0
+                timeout=3.5
             )
             return res
         except asyncio.TimeoutError:
-            print("[LLMService:Evon] Inference timed out after 12.0s, proceeding to next provider")
+            print("[LLMService:Evon] Inference timed out after 3.5s, proceeding to sovereign reasoning")
             return None
         except Exception as e:
             print(f"[LLMService:Evon] Error: {e}")
@@ -298,86 +298,113 @@ class LLMService:
         is_english = bool(re.search(r"\b(what|why|how|when|where|who|can you|tell me|price of|explain|is there|hello|hi)\b", q))
 
         # 2. Who are you / Identity / Intro
-        if any(w in q for w in ["who are you", "what is your name", "kaun ho", "tum kaun", "kya ho", "introduce"]):
+        if any(w in q for w in ["who are you", "what is your name", "kaun ho", "tum kaun", "kya ho", "introduce", "कौन हो", "तुम कौन", "क्या हो", "नाम क्या"]):
             if is_english:
                 return f"Hello {f_name} ji! I am Kisan-Vaani, your sovereign voice agri-intelligence advisor powered by Gnani AI. I help you with live APMC mandi rates, 0% commission eNAM protection, crop disease diagnosis, and highest profit arbitrage."
             return f"Namaste {f_name} ji! Main Kisan-Vaani hoon—Gnani AI dwara chalit aapka vyaktigat kheti aur mandi advisor. Main aapko live mandi bhav, net profit hisaab, fasal bimari ka ilaj aur eNAM adhikar batata hoon. Boliye, aaj kya madad karun?"
 
         # 3. How are you / Casual Greeting
-        if any(w in q for w in ["how are you", "kaise ho", "kya haal hai", "kaisa chal raha"]):
+        if any(w in q for w in ["how are you", "kaise ho", "kya haal hai", "kaisa chal raha", "कैसे हो", "क्या हाल", "नमस्ते", "राम राम", "pranam"]):
             if is_english:
                 return f"I am doing wonderful, {f_name} ji! Always ready to serve our farmers. How are your fields in {village} doing today? Tell me which crop or mandi you want to discuss."
-            return f"Main badhiya hoon {f_name} ji! {village} me aapki kheti-baadi kaisi chal rahi hai? Batayein aaj kaunsi fasal ka bhav dekhna hai ya koi kheti ki salah chahiye?"
+            return f"Main badhiya hoon {f_name} ji! Aapki kheti-baadi kaisi chal rahi hai? Batayein aaj kaunsi fasal ka bhav dekhna hai ya koi kheti ki salah chahiye?"
 
-        # 4. Mandi Rates & Commodities (Direct entity lookup in English or Hindi)
+        # 4. WhatsApp Inquiry
+        if any(w in q for w in ["whatsapp", "व्हाट्सएप", "व्हाट्सऐप", "whatsapp use", "what is whatsapp"]):
+            return (
+                f"{f_name} ji, Kisan-Vaani ka WhatsApp feature aapko bina kisi jhanjhat ke poora mandi hisaab seedhe aapke WhatsApp par bhejta hai! "
+                f"Isme taaza mandi rate, sabse sasta transport diesel kharcha, net munafa aur eNAM 0% commission kanooni slip shaamil hoti hai. "
+                f"Aadhatiya jab commission kaate, aap ye slip dikha kar kanooni haq le sakte hain."
+            )
+
+        # 5. Mandi Rates & Commodities (Direct entity lookup in English, Hinglish, or Devanagari)
         comm_map = {
             "onion": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
             "pyaaz": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
             "kanda": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
+            "प्याज": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
+            "प्याज़": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
+            "कांदा": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
             "tomato": ("Tamatar", 1550, 1850, "Pimpalgaon aur Nashik Dindori"),
             "tamatar": ("Tamatar", 1550, 1850, "Pimpalgaon aur Nashik Dindori"),
+            "टमाटर": ("Tamatar", 1550, 1850, "Pimpalgaon, Nashik aur Azadpur"),
             "potato": ("Aloo", 1650, 1950, "Agra aur Azadpur mandi"),
             "aloo": ("Aloo", 1650, 1950, "Agra aur Azadpur mandi"),
+            "आलू": ("Aloo", 1650, 1950, "Agra aur Azadpur mandi"),
             "garlic": ("Lahsun", 11500, 14200, "Mandsaur aur Neemuch mandi"),
             "lahsun": ("Lahsun", 11500, 14200, "Mandsaur aur Neemuch mandi"),
+            "लहसुन": ("Lahsun", 11500, 14200, "Mandsaur aur Neemuch mandi"),
             "ginger": ("Adrak", 6800, 8100, "Shimoga aur Nashik mandi"),
             "adrak": ("Adrak", 6800, 8100, "Shimoga aur Nashik mandi"),
+            "अदरक": ("Adrak", 6800, 8100, "Shimoga aur Nashik mandi"),
             "chilli": ("Mirchi", 4200, 5400, "Guntur aur Byadgi mandi"),
             "mirch": ("Mirchi", 4200, 5400, "Guntur aur Byadgi mandi"),
+            "मिर्च": ("Mirchi", 4200, 5400, "Guntur aur Byadgi mandi"),
             "wheat": ("Gehun", 2580, 2720, "Khanna aur Indore mandi"),
             "gehun": ("Gehun", 2580, 2720, "Khanna aur Indore mandi"),
+            "गेहूं": ("Gehun", 2580, 2720, "Khanna aur Indore mandi"),
             "soyabean": ("Soyabean", 4500, 4850, "Indore aur Latur mandi"),
+            "सोयाबीन": ("Soyabean", 4500, 4850, "Indore aur Latur mandi"),
             "cotton": ("Kapas", 7520, 7950, "Rajkot aur Sirsa mandi"),
             "kapas": ("Kapas", 7520, 7950, "Rajkot aur Sirsa mandi"),
+            "कपास": ("Kapas", 7520, 7950, "Rajkot aur Sirsa mandi"),
+            "sarso": ("Sarson", 5850, 6300, "Bharatpur aur Jaipur mandi"),
+            "सरसों": ("Sarson", 5850, 6300, "Bharatpur aur Jaipur mandi"),
             "cauliflower": ("Gobhi", 1400, 1750, "Nashik aur Azadpur"),
-            "gobhi": ("Gobhi", 1400, 1750, "Nashik aur Azadpur")
+            "gobhi": ("Gobhi", 1400, 1750, "Nashik aur Azadpur"),
+            "गोभी": ("Gobhi", 1400, 1750, "Nashik aur Azadpur")
         }
+
+        # Check for state context like Punjab
+        state_ctx = ""
+        if any(w in q for w in ["punjab", "पंजाब"]):
+            state_ctx = "Punjab me Jalandhar, Ludhiana aur Khanna mandiyon me achhi aawak chal rahi hai. "
 
         for comm_k, (comm_name, avg_p, top_p, top_m) in comm_map.items():
             if comm_k in q:
                 if is_english:
                     return f"{f_name} ji, today's benchmark rate for {comm_name} is around ₹{avg_p} to ₹{top_p} per quintal in {top_m}. How many bags or quintals are you planning to sell?"
-                return f"{f_name} ji, aaj {comm_name} ka taaza bhav {top_m} me ₹{avg_p} se ₹{top_p} prati quintal chal raha hai. Aapke paas bechne ke liye lagbhag kitna maal hai?"
+                return f"{f_name} ji, aaj {comm_name} ka taaza bhav {top_m} me ₹{avg_p} se ₹{top_p} prati quintal chal raha hai. {state_ctx}Aapke paas bechne ke liye lagbhag kitna maal hai?"
 
-        # 5. Selling produce / Arbitrage inquiry without specific crop
-        if any(w in q for w in ["sell", "bechna", "beche", "mandi jana", "bhav batao", "rate batao"]):
+        # 6. Selling produce / Arbitrage inquiry without specific crop
+        if any(w in q for w in ["sell", "bechna", "beche", "mandi jana", "bhav batao", "rate batao", "बेचना", "बेचनी", "भाव", "रेट", "बिक्री"]):
             if is_english:
-                return f"{f_name} ji, onion and tomato arrivals are strong in Nashik and Lasalgaon mandis today. Which specific crop do you have ready, and how many quintals or crates are you harvesting?"
-            return f"{f_name} ji, aaj aas-paas ki mandiyon me aawak achhi hai. Aapke paas kaunsi fasal taiyar hai—jaise Pyaaz, Tamatar ya koi aur sabzi? Fasal aur katte batayein toh main net profit nikaal deta hoon."
+                return f"{f_name} ji, produce arrivals are active in primary APMC mandis today. Which specific crop do you have ready, and how many quintals or crates are you harvesting?"
+            return f"{f_name} ji, {state_ctx}aaj aas-paas ki mandiyon me aawak achhi chal rahi hai. Aapke paas kaunsi fasal taiyar hai—jaise Tamatar, Pyaaz, ya Gehun? Fasal aur katte batayein toh main exact munafa nikaal deta hoon."
 
-        # 6. Disease / Pest / Crop Doctor
-        if any(w in q for w in ["bimari", "keede", "yellow", "peele", "fungus", "patte", "disease", "pest", "spray", "dawai", "curl"]):
+        # 7. Disease / Pest / Crop Doctor
+        if any(w in q for w in ["bimari", "keede", "yellow", "peele", "fungus", "patte", "disease", "pest", "spray", "dawai", "curl", "बीमारी", "कीड़े", "रोग", "दवाई", "स्प्रे"]):
             if is_english:
                 return f"{f_name} ji, for leaf yellowing or pests, spray Neem oil (5ml/liter) for initial control. If it is severe blight or fungal rot, spray Mancozeb or Copper Oxychloride @ 2.5g per liter. What specific crop leaves are showing symptoms?"
             return f"{f_name} ji, agar patte peele pad rahe hain ya faphund hai, toh 2.5 gram Mancozeb ya Saaf powder prati litre paani me ghol kar spray karein. Neem tail 5ml per litre se ras-choosak keede bhi control hote hain. Kaunsi fasal me ye dikkat aa rahi hai?"
 
-        # 7. Fertilizer / Nutrition
-        if any(w in q for w in ["khad", "fertilizer", "urea", "dap", "npk", "potash"]):
+        # 8. Fertilizer / Nutrition
+        if any(w in q for w in ["khad", "fertilizer", "urea", "dap", "npk", "potash", "खाद", "यूरिया", "डीएपी"]):
             if is_english:
                 return f"{f_name} ji, apply balanced NPK (19:19:19) for vegetative growth, and avoid excessive single-shot Urea which attracts pests. Apply Urea in split doses along with adequate soil moisture."
             return f"{f_name} ji, khad ke liye DAP buwaai ke samay jado ke paas dein aur Urea ko 2 se 3 barabbar kiston me sinchai ke sath dein. NPK 19:19:19 ka foliar spray paudhe me nayi shakhaon ke liye sabse faaydemand rehta hai."
 
-        # 8. eNAM / Commission / Aadhatiya Exploitation
-        if any(w in q for w in ["commission", "aadhatiya", "dalal", "enam", "katauti", "illegal", "cheat"]):
+        # 9. eNAM / Commission / Aadhatiya Exploitation
+        if any(w in q for w in ["commission", "aadhatiya", "dalal", "enam", "katauti", "illegal", "cheat", "कमीशन", "आढ़तिया", "दलाल", "कटौती"]):
             if is_english:
                 return f"{f_name} ji, under eNAM and statutory APMC Act Sections 32 & 44, farmers are strictly exempt from commission (0% commission). Only the licensed buyer pays the mandi cess and brokerage. Demand an electronic weighbridge slip!"
             return f"{f_name} ji, eNAM kanoon ke tehat kisan se ek rupaye ka bhi commission lena kanoonan jurm hai (0% commission). Commission khareedaar vyapari dega. Agar koi aapse katauti kare toh computerized eNAM slip maangein aur Mandi Secretary se complaint karein."
 
-        # 9. Government Schemes
-        if any(w in q for w in ["pm kisan", "kcc", "yojana", "scheme", "subsidy", "bima", "fasal bima", "loan"]):
+        # 10. Government Schemes
+        if any(w in q for w in ["pm kisan", "kcc", "yojana", "scheme", "subsidy", "bima", "fasal bima", "loan", "योजना", "सब्सिडी", "बीमा", "कर्ज"]):
             if is_english:
                 return f"{f_name} ji, under PM-Kisan you receive ₹6,000 annually in 3 DBT installments. For low-interest crop loans, KCC provides up to ₹3 lakh at only 4% interest when repaid on time."
             return f"{f_name} ji, PM-Kisan Samman Nidhi ki ₹2,000 ki kistein seedhe bank khate me aati hain, aur Kisan Credit Card par kisan ko sirf 4% byaj par karz milta hai. PM Fasal Bima ke liye nuksan ke 72 ghante me helpline 14447 par call karein."
 
-        # 10. Weather & Sowing
-        if any(w in q for w in ["weather", "mausam", "rain", "baarish", "temperature", "sowing", "buwaai"]):
+        # 11. Weather & Sowing
+        if any(w in q for w in ["weather", "mausam", "rain", "baarish", "temperature", "sowing", "buwaai", "मौसम", "बारिश", "बुवाई"]):
             if is_english:
                 return f"{f_name} ji, weather across {district} and {village} is largely favorable for harvesting and mandi transit. Ensure moisture in harvested produce is below 12% to command premium mandi bids."
             return f"{f_name} ji, {village} aur {district} me mausam kisanon ke anukool bana hua hai. Mandi maal le jaate waqt tarpaulin sath rakhein aur nami ko dhyan me rakh kar hi lot ki grading karein taaki uncha bhav mile."
 
-        # 11. General Intelligent Conversational Fallback
+        # 12. Smart Dynamic Conversational Response (Never repeat the static canned sentence!)
         if is_english:
-            return f"{f_name} ji, I heard your question regarding '{query}'. In Indian agriculture and mandi trading, getting the best net profit depends on daily market arrivals, zero middleman commission, and timely transport. Tell me which crop or issue you'd like us to evaluate right now."
-        return f"{f_name} ji, aapne '{query}' ke bare me poocha hai. Kheti-baadi aur mandi vyapar me sahi samay par taaza mandi bhav janna aur kanooni adhikar samajhna sabse zaroori hai. Batayein aaj kaunsi fasal ya suvidha par baat karein?"
+            return f"{f_name} ji, regarding your query, getting the best profit requires checking today's APMC modal rates, keeping middleman commission at 0%, and choosing the lowest diesel route. Tell me which crop or mandi you want us to evaluate."
+        return f"{f_name} ji, aap kisi bhi fasal ka taaza mandi rate, bechne ka sabse munafedaar tareeqa, fasal ki dawai ya kisan yojana ke bare me pooch sakte hain. Batayein kis fasal par baat karein?"
 
 llm_service = LLMService()

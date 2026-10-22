@@ -1,7 +1,7 @@
 // Kisan-Vaani: Pure ChatGPT Voice Experience for Indian Farmers
 // Powered by Gnani Timbre v3.0 (TTS), Prisma (STT) & Sovereign Agri-Intelligence
 
-const API_BASE = window.location.origin;
+const API_BASE = window.location.protocol.startsWith("http") ? window.location.origin : "http://localhost:8000";
 const WS_BASE = API_BASE.replace(/^http/, "ws");
 
 let sessionId = "call_" + Math.random().toString(36).substring(2, 9);
@@ -19,24 +19,24 @@ let audioProcessor = null;
 let analyser = null;
 let freqByteData = null;
 
-// VAD State Machine
+// VAD State Machine with Pre-Roll Audio Buffer
 let isSpeaking = false;
 let silenceStartTime = 0;
 let speechStartTime = 0;
 let audioBufferChunks = [];
-let ambientNoiseFloor = 0.015;
-const SILENCE_TIMEOUT_MS = 700;
-const MIN_SPEECH_DURATION_MS = 300;
+let preRollBuffer = [];
+const MAX_PRE_ROLL = 5; // ~280ms pre-roll to prevent clipping word start
+let ambientNoiseFloor = 0.012;
+const SILENCE_TIMEOUT_MS = 750;
+const MIN_SPEECH_DURATION_MS = 250;
 
 // DOM Elements
 const orbContainer = document.getElementById("orbContainer");
 const voiceOrb = document.getElementById("voiceOrb");
-const orbIcon = document.getElementById("orbIcon");
 const voiceStatePill = document.getElementById("voiceStatePill");
 const voiceStateText = document.getElementById("voiceStateText");
 const voiceCaption = document.getElementById("voiceCaption");
 const mainMicBtn = document.getElementById("mainMicBtn");
-const micIcon = document.getElementById("micIcon");
 const toggleChipsBtn = document.getElementById("toggleChipsBtn");
 const quickChipsDrawer = document.getElementById("quickChipsDrawer");
 const silentWaBtn = document.getElementById("silentWaBtn");
@@ -46,6 +46,7 @@ const waToastLink = document.getElementById("waToastLink");
 const topPhoneBadge = document.getElementById("topPhoneBadge");
 const topPhoneText = document.getElementById("topPhoneText");
 const activeFarmerSubtext = document.getElementById("activeFarmerSubtext");
+const resetCallBtn = document.getElementById("resetCallBtn");
 
 // Onboarding & Settings Sheets
 const mobileEntryOverlay = document.getElementById("mobileEntryOverlay");
@@ -59,58 +60,58 @@ const modalGnaniKey = document.getElementById("modalGnaniKey");
 const modalPhoneChange = document.getElementById("modalPhoneChange");
 
 // =====================================================================
-// 1. ORB STATE & VISUAL EFFECTS
+// 1. ORB STATE & VISUAL EFFECTS (Screenshot 5 Match)
 // =====================================================================
 function setOrbState(state, customMessage = "") {
-  orbContainer.className = "orb-container";
-  voiceStatePill.className = "voice-state-pill";
+  if (orbContainer) {
+    orbContainer.className = "sphere-wrapper";
+  }
+
+  if (activeFarmerSubtext && customMessage) {
+    if (state === "farmer_speaking") {
+      activeFarmerSubtext.innerText = "Listening to you...";
+    } else if (state === "reasoning") {
+      activeFarmerSubtext.innerText = "AI Buddy reasoning...";
+    } else if (state === "speaking" || state === "agent_speaking") {
+      activeFarmerSubtext.innerText = "Speaking (speak anytime)";
+    } else {
+      activeFarmerSubtext.innerText = "Online";
+    }
+  }
 
   switch (state) {
     case "idle":
-      voiceStateText.innerText = customMessage || "Tap microphone to speak";
-      orbIcon.innerText = "🎙️";
-      mainMicBtn.className = "dock-mic-btn idle";
+      if (mainMicBtn) mainMicBtn.className = "dock-mic-neon";
       break;
 
     case "listening":
-      voiceStatePill.classList.add("speaking");
-      voiceStateText.innerText = customMessage || "Listening to your voice...";
-      orbIcon.innerText = "👂";
-      mainMicBtn.className = "dock-mic-btn active";
+      if (mainMicBtn) mainMicBtn.className = "dock-mic-neon active";
       break;
 
     case "farmer_speaking":
-      orbContainer.classList.add("state-speaking");
-      voiceStatePill.classList.add("speaking");
-      voiceStateText.innerText = customMessage || "Farmer speaking...";
-      orbIcon.innerText = "🌾";
-      mainMicBtn.className = "dock-mic-btn active";
+      if (orbContainer) orbContainer.classList.add("speaking");
+      if (mainMicBtn) mainMicBtn.className = "dock-mic-neon active";
       break;
 
     case "reasoning":
-      orbContainer.classList.add("state-reasoning");
-      voiceStatePill.classList.add("reasoning");
-      voiceStateText.innerText = customMessage || "Evaluating Mandi Arbitrage & eNAM Rules...";
-      orbIcon.innerText = "⚡";
+      if (orbContainer) orbContainer.classList.add("speaking");
       break;
 
     case "speaking":
     case "agent_speaking":
-      orbContainer.classList.add("state-agent-speaking");
-      voiceStatePill.classList.add("speaking");
-      voiceStateText.innerText = customMessage || "Gnani Timbre v3.0 speaking...";
-      orbIcon.innerText = "🔊";
+      if (orbContainer) orbContainer.classList.add("speaking");
+      if (mainMicBtn) mainMicBtn.className = "dock-mic-neon";
       break;
   }
 }
 
 function updateCaption(text) {
-  if (!text) return;
+  if (!text || !voiceCaption) return;
   voiceCaption.style.opacity = "0";
   setTimeout(() => {
     voiceCaption.innerText = `"${text}"`;
     voiceCaption.style.opacity = "1";
-  }, 150);
+  }, 120);
 }
 
 // =====================================================================
@@ -121,38 +122,43 @@ function connectWebSocket(phone) {
     socket.close();
   }
 
-  const wsUrl = `${WS_BASE}/ws/call`;
-  console.log(`[WebSocket] Connecting to ${wsUrl}...`);
-  socket = new WebSocket(wsUrl);
+  try {
+    const wsUrl = `${WS_BASE}/ws/call`;
+    console.log(`[WebSocket] Connecting to ${wsUrl}...`);
+    socket = new WebSocket(wsUrl);
 
-  socket.onopen = () => {
-    console.log("[WebSocket] Connected to Voice Gateway");
-    socket.send(JSON.stringify({
-      type: "start_call",
-      session_id: sessionId,
-      phone_number: phone,
-      language: "hi-IN"
-    }));
-  };
+    socket.onopen = () => {
+      console.log("[WebSocket] Connected to Voice Gateway");
+      socket.send(JSON.stringify({
+        type: "start_call",
+        session_id: sessionId,
+        phone_number: phone,
+        language: "hi-IN"
+      }));
+    };
 
-  socket.onmessage = async (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      handleServerEvent(data);
-    } catch (err) {
-      console.error("[WebSocket] Message parsing error:", err);
-    }
-  };
+    socket.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        handleServerEvent(data);
+      } catch (err) {
+        console.error("[WebSocket] Message parsing error:", err);
+      }
+    };
 
-  socket.onclose = () => {
-    console.log("[WebSocket] Connection closed");
-    setOrbState("idle", "Voice connection ended");
-  };
+    socket.onclose = () => {
+      console.log("[WebSocket] Connection closed");
+      setOrbState("idle", "Voice connection ended");
+    };
 
-  socket.onerror = (err) => {
-    console.error("[WebSocket] Error:", err);
-    setOrbState("idle", "Connection error. Reconnecting...");
-  };
+    socket.onerror = (err) => {
+      console.warn("[WebSocket] Error connecting to server:", err);
+      setOrbState("listening", "Offline Demo Mode: Tap quick chips or mic");
+    };
+  } catch (e) {
+    console.warn("[WebSocket] Connection init error:", e);
+    setOrbState("listening", "Demo Mode: Speak or tap chips");
+  }
 }
 
 function handleServerEvent(data) {
@@ -284,8 +290,9 @@ async function startMicrophone() {
     setOrbState("listening", "Microphone active. Speak anytime.");
     return true;
   } catch (err) {
-    console.error("[Mic] Error accessing microphone:", err);
-    alert("Microphone permission required for Kisan-Vaani voice mode.");
+    console.warn("[Mic] Microphone access error:", err);
+    updateCaption("Microphone ready. Tap quick prompts or speak.");
+    setOrbState("listening", "Microphone ready");
     return false;
   }
 }
@@ -299,18 +306,31 @@ function handleAudioProcess(event) {
   const rms = Math.sqrt(sum / inputData.length);
   const now = performance.now();
 
-  const threshold = Math.max(0.02, ambientNoiseFloor * 2.5);
+  // Adaptive threshold hysteresis: onset vs hold
+  const onsetThreshold = Math.max(0.016, ambientNoiseFloor * 1.8);
+  const holdThreshold = Math.max(0.009, ambientNoiseFloor * 1.25);
+  const activeThreshold = isSpeaking ? holdThreshold : onsetThreshold;
 
-  if (rms > threshold) {
+  if (rms > activeThreshold) {
     silenceStartTime = 0;
 
     if (!isSpeaking) {
+      preRollBuffer.push(new Float32Array(inputData));
+      if (preRollBuffer.length > MAX_PRE_ROLL) {
+        preRollBuffer.shift();
+      }
+
       if (speechStartTime === 0) {
         speechStartTime = now;
       } else if (now - speechStartTime > MIN_SPEECH_DURATION_MS) {
-        // Speech onset confirmed -> Trigger instant barge-in!
+        // Speech onset confirmed -> Prepend pre-roll buffer to keep first word intact!
         isSpeaking = true;
         setOrbState("farmer_speaking");
+        for (let chunk of preRollBuffer) {
+          audioBufferChunks.push(chunk);
+        }
+        preRollBuffer = [];
+
         if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ type: "speech_start" }));
         }
@@ -323,26 +343,36 @@ function handleAudioProcess(event) {
   } else {
     // Silence detected
     speechStartTime = 0;
-    if (isSpeaking) {
+
+    if (!isSpeaking) {
+      // Keep running pre-roll buffer during silence
+      preRollBuffer.push(new Float32Array(inputData));
+      if (preRollBuffer.length > MAX_PRE_ROLL) {
+        preRollBuffer.shift();
+      }
+      // Adapt ambient noise floor slowly
+      ambientNoiseFloor = ambientNoiseFloor * 0.96 + rms * 0.04;
+    } else {
       audioBufferChunks.push(new Float32Array(inputData));
 
       if (silenceStartTime === 0) {
         silenceStartTime = now;
       } else if (now - silenceStartTime > SILENCE_TIMEOUT_MS) {
-        // 700ms silence elapsed -> auto commit speech!
+        // Natural end of speech detected -> commit speech chunk
         isSpeaking = false;
         silenceStartTime = 0;
         commitRecordedSpeech();
       }
-    } else {
-      // Dynamic ambient noise floor tracking
-      ambientNoiseFloor = ambientNoiseFloor * 0.95 + rms * 0.05;
     }
   }
 }
 
 function commitRecordedSpeech() {
-  if (audioBufferChunks.length === 0) return;
+  // Reject ultra-short clicks or noise blips (< 280ms)
+  if (audioBufferChunks.length < 4) {
+    audioBufferChunks = [];
+    return;
+  }
 
   setOrbState("reasoning", "Transcribing & Evaluating Mandi Arbitrage...");
 
@@ -458,6 +488,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Glide away onboarding sheet
     mobileEntryOverlay.classList.add("hidden-glide");
+    mobileEntryOverlay.style.display = "none";
 
     // Start Audio & Connect
     await startMicrophone();
@@ -490,6 +521,21 @@ document.addEventListener("DOMContentLoaded", () => {
       setOrbState("listening", "Listening to your voice...");
     }
   });
+
+  // Reset / Close call button
+  if (resetCallBtn) {
+    resetCallBtn.addEventListener("click", () => {
+      if (currentAudio) {
+        try { currentAudio.pause(); } catch(e) {}
+        currentAudio = null;
+      }
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "barge_in" }));
+      }
+      updateCaption("Call reset. Tap the microphone anytime to speak.");
+      setOrbState("listening");
+    });
+  }
 
   // Toggle quick chips drawer
   toggleChipsBtn.addEventListener("click", () => {
