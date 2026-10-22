@@ -9,5 +9,5 @@ aiofiles>=23.2.1
 python-multipart>=0.0.32
 gradio_client>=1.0.0
 supabase>=2.0.0
-audioop-lts>=0.2.0
+
 
