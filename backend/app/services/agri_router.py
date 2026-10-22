@@ -84,7 +84,7 @@ class AgriAgentRouter:
            • If Weather / Sowing / Scheme -> Tool C (Agronomy & Schemes)
            • Else -> Concise Conversational Chit-chat
         """
-        raw_text = utterance.strip()
+        raw_text = utterance.strip().translate(str.maketrans('०१२३४५६७८९', '0123456789'))
         f_name = getattr(session, "farmer_name", "Kisan Bhai") or "Kisan Bhai"
 
         # 1. Strict Domain Guardrail Check
@@ -125,17 +125,48 @@ class AgriAgentRouter:
                 }
             }
 
-        # 3. TOOL A: Mandi Price / Rate / Market Arbitrage Tool
-        is_mandi_query = any(w in clean for w in [
+        from app.services.agri_intelligence import agri_engine
+
+        # 3. Handle Active Multi-Turn Slot Filling States (Location, Quantity, Transport)
+        current_step = getattr(session, "step", "")
+        if current_step == "AWAITING_QUANTITY":
+            qty_res = agri_engine._handle_quantity_response(enriched_text, session)
+            if qty_res:
+                return qty_res
+
+        if current_step == "AWAITING_TRANSPORT":
+            trans_res = agri_engine._handle_transport_response(enriched_text, session)
+            if trans_res:
+                return trans_res
+
+        if current_step == "AWAITING_LOCATION":
+            loc_res = agri_engine._handle_location_response(enriched_text, session)
+            if loc_res:
+                return loc_res
+
+        # 4. TOOL A: Mandi Price / Stock Weight / Selling / Market Arbitrage Tool
+        num, unit = agri_engine._extract_quantity(clean)
+        is_stock_or_weight_query = (num is not None) or any(w in clean for w in [
+            "bechna", "bechu", "maal", "stock", "kamai", "munafa", "earning", "kitna milega", "kitna banta",
+            "क्विंटल", "कुंतल", "quintal", "kilo", "किलो", "kg", "बोरी", "कट्टा", "bori", "katta", "ton", "टन"
+        ])
+
+        is_mandi_query = is_stock_or_weight_query or any(w in clean for w in [
             "bhav", "rate", "bhav kya", "rate kya", "kimat", "mandi", "mandi bhav", "aaj ka rate",
             "भाव", "रेट", "भाव क्या", "मंडी भाव", "रेट बताओ", "दाम", "कीमत", "बिकेगा"
         ])
 
-        if is_mandi_query:
-            from app.services.agri_intelligence import agri_engine
+        # If user states crop/commodity directly (e.g. potato, tomato, onion), treat as Mandi inquiry first
+        matched_comm = agri_engine._match_commodity(clean)
+        if matched_comm and is_mandi_query:
             return agri_engine._handle_commodity_query(enriched_text, session) or agri_engine.analyze_and_respond(enriched_text, session)
 
-        # 4. TOOL B: Agri-RAG ICAR / KVK Scientific Advisory Tool
+        if is_mandi_query:
+            mandi_res = agri_engine._handle_commodity_query(enriched_text, session) or agri_engine.analyze_and_respond(enriched_text, session)
+            if mandi_res:
+                return mandi_res
+
+        # 5. TOOL B: Agri-RAG ICAR / KVK Scientific Advisory Tool (Only for actual diseases, pests, remedies)
         rag_result = agri_rag.answer_query(enriched_text, f_name)
         if rag_result:
             return rag_result

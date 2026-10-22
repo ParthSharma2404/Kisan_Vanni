@@ -84,6 +84,20 @@ class AgriRAGService:
         return [doc for score, doc in scored_docs[:top_k]]
 
     def answer_query(self, query: str, farmer_name: str = "Kisan Bhai") -> Optional[Dict[str, Any]]:
+        clean = query.lower()
+
+        # Strict Guardrail: Do NOT trigger disease/pest RAG on commodity/stock/mandi queries!
+        advisory_intent_words = [
+            "bimari", "beemari", "rog", "keeda", "keede", "faphund", "fungus", "virus", "sundi", "thrips",
+            "safed makhi", "whitefly", "curl", "dawai", "spray", "chhidkaav", "ilaj", "upchar", "khad",
+            "urea", "dap", "potash", "pila", "peele", "chhed", "sukh", "murjha", "jod", "patti", "patte",
+            "blight", "borer", "pest", "disease", "treatment", "medicine", "fertilizer",
+            "झुलसा", "रोग", "बीमारी", "दवाई", "दवा", "स्प्रे", "कीड़ा", "कीड़े", "इलाज", "उपचार", "खाद", "यूरिया", "पत्ते", "पीले", "छिड़काव"
+        ]
+        has_advisory_intent = any(w in clean for w in advisory_intent_words)
+        if not has_advisory_intent:
+            return None
+
         matched_docs = self.retrieve(query, top_k=1)
         if not matched_docs:
             return None

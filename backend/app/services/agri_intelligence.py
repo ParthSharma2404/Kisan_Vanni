@@ -161,7 +161,7 @@ COMMODITY_DATABASE = {
         }
     },
     "potato": {
-        "names": ["potato", "aloo", "alu", "batata", "आलू", "आलु", "बटाटा"],
+        "names": ["potato", "aloo", "alu", "aaloo", "aalu", "batata", "आलू", "आलु", "बटाटा"],
         "hindi": "Aloo",
         "benchmark_price": 1650,
         "min_price": 1300,
@@ -578,29 +578,45 @@ class AgriIntelligenceEngine:
         if num:
             session.raw_quantity_num = num
             session.unit_type = unit
-            if unit in ["katta", "bori", "bag"]:
-                qtl = round((num * 50.0) / 100.0, 1)
+            if unit == "kg":
+                qtl = round(num / 100.0, 3)
+            elif unit in ["katta", "bori", "bag"]:
+                qtl = round((num * 50.0) / 100.0, 2)
             elif unit == "ton":
-                qtl = round(num * 10.0, 1)
+                qtl = round(num * 10.0, 2)
+            elif unit == "mann":
+                qtl = round((num * 40.0) / 100.0, 2)
             elif unit == "pickup":
-                qtl = round(num * 18.0, 1)
+                qtl = round(num * 18.0, 2)
             elif unit == "trolley":
-                qtl = round(num * 30.0, 1)
+                qtl = round(num * 30.0, 2)
             else:
-                qtl = float(num)
+                qtl = round(float(num), 2)
             session.quantity_quintals = qtl
 
-            total_gross = int(qtl * rate)
+            rate_per_kg = round(rate / 100.0, 2)
+            total_gross = int(round(qtl * rate))
+            est_freight = int(round(qtl * 35))
+            est_cess = int(round(total_gross * 0.01))
+            est_hamali = int(round(qtl * 15))
+            est_net = int(round(total_gross - est_freight - est_cess - est_hamali))
+
+            if unit == "kg":
+                weight_str = f"{int(num) if num.is_integer() else num} किलो ({qtl} क्विंटल)"
+            else:
+                weight_str = f"{int(qtl) if qtl.is_integer() else qtl} क्विंटल ({int(round(qtl * 100))} किलो)"
+
             spoken = (
-                f"{session.farmer_name} ji! {session.district or session.state} me {mandis} mandiyon me {hindi_name} ka taaza bhav lagbhag ₹{rate:,} prati quintal chal raha hai ({p_range}). "
-                f"Aapke {qtl} quintal maal ka andazan gross moolya lagbhag ₹{total_gross:,} rupaye banta hai! {note} "
+                f"{session.farmer_name} ji! {session.district or session.state} me {mandis} mandiyon me {hindi_name} ka taaza modal bhav lagbhag ₹{rate:,} prati quintal (₹{rate_per_kg} prati kilo) chal raha hai ({p_range}). "
+                f"Aapke {weight_str} maal ka kul gross moolya ₹{total_gross:,} rupaye banta hai! "
+                f"Gaadi aur mandi kharcha nikaal kar lagbhag ₹{est_net:,} seedhe aapke haath me aayenge. {note} "
                 f"Mandi le jaane ke liye gaadi aapki apni hai, ya tempo bhade par karenge?"
             )
             session.step = "AWAITING_TRANSPORT"
         else:
             spoken = (
                 f"{session.farmer_name} ji! {session.district or session.state} me {mandis} mandiyon me {hindi_name} ka taaza bhav lagbhag ₹{rate:,} prati quintal chal raha hai ({p_range}). {note} "
-                f"Aapke paas bechne ke liye lagbhag kitna maal hai—jaise kitne katte ya quintal?"
+                f"Aapke paas bechne ke liye lagbhag kitna maal hai—jaise kitne katte, kilo ya quintal?"
             )
             session.step = "AWAITING_QUANTITY"
 
@@ -620,17 +636,52 @@ class AgriIntelligenceEngine:
         if num:
             session.raw_quantity_num = num
             session.unit_type = unit
-            if unit in ["katta", "bori", "bag"]:
-                qtl = round((num * 50.0) / 100.0, 1)
+            if unit == "kg":
+                qtl = round(num / 100.0, 3)
+            elif unit in ["katta", "bori", "bag"]:
+                qtl = round((num * 50.0) / 100.0, 2)
             elif unit == "ton":
-                qtl = round(num * 10.0, 1)
+                qtl = round(num * 10.0, 2)
+            elif unit == "mann":
+                qtl = round((num * 40.0) / 100.0, 2)
             elif unit == "pickup":
-                qtl = round(num * 18.0, 1)
+                qtl = round(num * 18.0, 2)
             elif unit == "trolley":
-                qtl = round(num * 30.0, 1)
+                qtl = round(num * 30.0, 2)
             else:
-                qtl = float(num)
+                qtl = round(float(num), 2)
             session.quantity_quintals = qtl
+
+            # Check if commodity is in session or in text
+            comm_key = getattr(session, "commodity", None)
+            if not comm_key:
+                matched = self._match_commodity(text)
+                if matched:
+                    comm_key = matched[0]
+                    session.commodity = comm_key
+
+            comm_data = COMMODITY_DATABASE.get(comm_key or "potato", COMMODITY_DATABASE["potato"])
+            hindi_crop = comm_data["hindi"]
+            rate = comm_data["benchmark_price"]
+            top_mandi = comm_data["top_mandis"][0]
+
+            state_code = getattr(session, "state", None) or "up"
+            reg_info = comm_data.get("regional_mandis", {}).get(state_code.lower())
+            if reg_info:
+                rate = reg_info["price"]
+                top_mandi = reg_info["mandis"]
+
+            rate_per_kg = round(rate / 100.0, 2)
+            gross_earning = int(round(qtl * rate))
+            est_freight = int(round(qtl * 35))
+            est_cess = int(round(gross_earning * 0.01))
+            est_hamali = int(round(qtl * 15))
+            est_net = int(round(gross_earning - est_freight - est_cess - est_hamali))
+
+            if unit == "kg":
+                weight_str = f"{int(num) if num.is_integer() else num} किलो ({qtl} क्विंटल)"
+            else:
+                weight_str = f"{int(qtl) if qtl.is_integer() else qtl} क्विंटल ({int(round(qtl * 100))} किलो)"
 
             own_words = ["apni", "apna", "bolero", "pickup", "tractor", "own", "meri", "khud ki", "अपनी", "अपना", "बोलेरो", "पिकअप", "ट्रैक्टर", "खुद की", "मेरी"]
             hired_words = ["tempo", "bhada", "bhade", "rent", "kiraya", "chhota hathi", "टेंपो", "भाड़ा", "भाड़े", "किराया", "छोटा हाथी"]
@@ -648,13 +699,24 @@ class AgriIntelligenceEngine:
             else:
                 session.step = "AWAITING_TRANSPORT"
                 spoken = (
-                    f"Bahut badhiya {session.farmer_name} ji! Kul {qtl} quintal maal darj ho gaya hai. "
-                    f"Ab batayein, mandi le jaane ke liye gaadi aapki apni hai, ya tempo bhade par karenge?"
+                    f"Kisan Bhai ji, aapke {weight_str} {hindi_crop} ka taaza mandi bhav {top_mandi} me "
+                    f"₹{rate:,} prati quintal (₹{rate_per_kg} prati kilo) chal raha hai. "
+                    f"Is hisaab se aapka kul gross moolya ₹{gross_earning:,} rupaye banta hai! "
+                    f"Kharcha kaatne ke baad lagbhag ₹{est_net:,} seedhe aapke haath me aayenge. "
+                    f"Batayein, mandi le jaane ke liye gaadi aapki apni hai, ya tempo bhade par karenge?"
                 )
                 return {
                     "spoken_text": spoken,
                     "step": "AWAITING_TRANSPORT",
-                    "data": {"quantity_quintals": qtl}
+                    "data": {
+                        "commodity": comm_key,
+                        "quantity_quintals": qtl,
+                        "gross_earning": gross_earning,
+                        "net_earning": est_net,
+                        "modal_rate": rate,
+                        "rate_per_kg": rate_per_kg,
+                        "top_mandi": top_mandi
+                    }
                 }
         return None
 
@@ -675,24 +737,68 @@ class AgriIntelligenceEngine:
         return None
 
     def _extract_quantity(self, text: str) -> Tuple[Optional[float], Optional[str]]:
-        pattern = r"(\d+(?:\.\d+)?)\s*(katta|katte|कट्टे|कट्टा|bori|boriyan|बोरी|बोरियां|bag|bags|बैग|quintal|kuntal|क्विंटल|कुंतल|qtl|ton|टन|trolley|ट्रॉली|ट्रोली|pickup|पिकअप|gadi|गाड़ी)?"
-        match = re.search(pattern, text)
+        # 1. Normalize Indic / Devanagari numerals ०-९ -> 0-9
+        indic_to_ascii = str.maketrans('०१२३४५६७८९', '0123456789')
+        clean = text.translate(indic_to_ascii).lower()
+
+        # 2. Hindi word numbers to digits
+        hindi_numbers = {
+            "ek": 1.0, "एक": 1.0, "do": 2.0, "दो": 2.0, "teen": 3.0, "तीन": 3.0,
+            "char": 4.0, "चार": 4.0, "paanch": 5.0, "panch": 5.0, "पांच": 5.0, "पाँच": 5.0,
+            "chhah": 6.0, "छह": 6.0, "saat": 7.0, "सात": 7.0, "aath": 8.0, "आठ": 8.0,
+            "nau": 9.0, "नौ": 9.0, "das": 10.0, "दस": 10.0, "gyarah": 11.0, "ग्यारह": 11.0,
+            "barah": 12.0, "बारह": 12.0, "pandrah": 15.0, "पंद्रह": 15.0, "bees": 20.0, "बीस": 20.0,
+            "pachis": 25.0, "पच्चीस": 25.0, "tees": 30.0, "तीस": 30.0, "chalis": 40.0, "चालीस": 40.0,
+            "pachaas": 50.0, "pachas": 50.0, "पचास": 50.0, "sau": 100.0, "सौ": 100.0, "dedh": 1.5, "derh": 1.5, "डेढ़": 1.5,
+            "dhai": 2.5, "ढाई": 2.5
+        }
+
+        # Match regex with unit
+        unit_regex = r"(katta|katte|कट्टे|कट्टा|bori|boriyan|बोरी|बोरियां|bag|bags|बैग|quintal|kuntal|क्विंटल|कुंतल|qtl|qtls|kilo|kilos|kg|kgs|किलो|किलोग्राम|केजी|ton|tonne|टन|mann|man|मन|trolley|traali|ट्रॉली|ट्रोली|pickup|पिकअप|gadi|गाड़ी)?"
+        pattern = r"(\d+(?:\.\d+)?)\s*" + unit_regex
+        match = re.search(pattern, clean)
+
         if match:
             num = float(match.group(1))
-            unit = match.group(2) or "quintal"
-            if any(x in unit for x in ["katt", "कट्ट", "कट्टा"]):
-                unit_norm = "katta"
-            elif any(x in unit for x in ["bor", "बोर"]):
+            raw_unit = (match.group(2) or "").strip().lower()
+            if any(x in raw_unit for x in ["kilo", "kg", "किलो", "किलोग्राम", "केजी"]):
+                unit_norm = "kg"
+            elif any(x in raw_unit for x in ["katt", "कट्ट", "कट्टा", "bor", "बोर", "bag", "बैग"]):
                 unit_norm = "bori"
-            elif any(x in unit for x in ["ton", "टन"]):
+            elif any(x in raw_unit for x in ["ton", "टन"]):
                 unit_norm = "ton"
-            elif any(x in unit for x in ["pickup", "पिकअप"]):
+            elif any(x in raw_unit for x in ["mann", "man", "मन"]):
+                unit_norm = "mann"
+            elif any(x in raw_unit for x in ["pickup", "पिकअप"]):
                 unit_norm = "pickup"
-            elif any(x in unit for x in ["troll", "ट्रॉली", "ट्रोली"]):
+            elif any(x in raw_unit for x in ["troll", "traal", "ट्रॉली", "ट्रोली"]):
                 unit_norm = "trolley"
             else:
                 unit_norm = "quintal"
             return num, unit_norm
+
+        # Try matching written hindi numbers
+        for w_word, w_val in hindi_numbers.items():
+            h_pattern = r"(?:^|\s)" + re.escape(w_word) + r"\s*" + unit_regex
+            h_match = re.search(h_pattern, clean)
+            if h_match:
+                raw_unit = (h_match.group(1) or "").strip().lower()
+                if any(x in raw_unit for x in ["kilo", "kg", "किलो", "किलोग्राम", "केजी"]):
+                    unit_norm = "kg"
+                elif any(x in raw_unit for x in ["katt", "कट्ट", "कट्टा", "bor", "बोर", "bag", "बैग"]):
+                    unit_norm = "bori"
+                elif any(x in raw_unit for x in ["ton", "टन"]):
+                    unit_norm = "ton"
+                elif any(x in raw_unit for x in ["mann", "man", "मन"]):
+                    unit_norm = "mann"
+                elif any(x in raw_unit for x in ["pickup", "पिकअप"]):
+                    unit_norm = "pickup"
+                elif any(x in raw_unit for x in ["troll", "traal", "ट्रॉली", "ट्रोली"]):
+                    unit_norm = "trolley"
+                else:
+                    unit_norm = "quintal"
+                return w_val, unit_norm
+
         return None, None
 
     def _handle_disease_pest_query(self, text: str, session: Any) -> Optional[Dict[str, Any]]:
