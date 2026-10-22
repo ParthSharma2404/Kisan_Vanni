@@ -257,6 +257,9 @@ function handleServerEvent(data) {
       } catch (e) {}
       currentAudio = null;
     }
+    if (window.speechSynthesis) {
+      try { window.speechSynthesis.cancel(); } catch (e) {}
+    }
     setOrbState("farmer_speaking", "AI voice halted. You have the floor.");
   }
 
@@ -280,8 +283,9 @@ function handleServerEvent(data) {
   }
 
   else if (type === "agent_audio") {
-    if (data.text) {
-      updateCaption(data.text);
+    const speechText = data.text || "";
+    if (speechText) {
+      updateCaption(speechText);
     }
 
     // Check for background WhatsApp dispatch
@@ -289,45 +293,116 @@ function handleServerEvent(data) {
       showWhatsAppToast(data.data.phone_number || activePhoneNumber, data.data.whatsapp_url);
     }
 
-    // Playback Gnani Timbre neural audio if provided
+    // Playback Gnani Timbre neural audio if provided; otherwise fallback to browser speech synthesis
     if (data.audio_base64) {
-      playAgentAudio(data.audio_base64);
+      playAgentAudio(data.audio_base64, speechText);
+    } else if (speechText) {
+      speakWithBrowserTTS(speechText);
     } else {
       setOrbState("listening", "Listening to your voice...");
     }
   }
 }
 
-function playAgentAudio(base64Wav) {
+// Fail-safe Browser Speech Synthesis (Hindi hi-IN)
+function speakWithBrowserTTS(text) {
+  if (!text || !window.speechSynthesis) {
+    if (!isMicMuted) setOrbState("listening", "Listening to your voice...");
+    return;
+  }
+
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "hi-IN";
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+
+    // Pick Hindi or Indian voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const hiVoice = voices.find(v => v.lang && (v.lang.toLowerCase().includes("hi") || v.lang.toLowerCase().includes("in")));
+    if (hiVoice) {
+      utterance.voice = hiVoice;
+    }
+
+    setOrbState("agent_speaking", "Kisan-Vaani speaking...");
+
+    utterance.onend = () => {
+      if (!isMicMuted) {
+        setOrbState("listening", "Listening to your voice...");
+      }
+    };
+
+    utterance.onerror = (e) => {
+      console.warn("[TTS] SpeechSynthesis error:", e);
+      if (!isMicMuted) {
+        setOrbState("listening", "Listening to your voice...");
+      }
+    };
+
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.warn("[TTS] SpeechSynthesis exception:", err);
+    if (!isMicMuted) {
+      setOrbState("listening", "Listening to your voice...");
+    }
+  }
+}
+
+function playAgentAudio(base64Wav, fallbackText = "") {
   if (currentAudio) {
     try {
       currentAudio.pause();
     } catch (e) {}
   }
+  if (window.speechSynthesis) {
+    try { window.speechSynthesis.cancel(); } catch (e) {}
+  }
 
-  currentAudio = new Audio("data:audio/wav;base64," + base64Wav);
-  setOrbState("agent_speaking", "Gnani Timbre v3.0 speaking...");
+  // Ensure AudioContext is active
+  if (audioContext && audioContext.state === "suspended") {
+    audioContext.resume().catch(() => {});
+  }
 
-  currentAudio.onended = () => {
-    currentAudio = null;
-    if (!isMicMuted) {
-      setOrbState("listening", "Listening to your voice...");
+  try {
+    currentAudio = new Audio("data:audio/wav;base64," + base64Wav);
+    currentAudio.volume = 1.0;
+    setOrbState("agent_speaking", "Gnani Timbre v3.0 speaking...");
+
+    currentAudio.onended = () => {
+      currentAudio = null;
+      if (!isMicMuted) {
+        setOrbState("listening", "Listening to your voice...");
+      }
+    };
+
+    currentAudio.onerror = (e) => {
+      console.warn("[Audio] WAV playback error, falling back to browser voice:", e);
+      currentAudio = null;
+      if (fallbackText) {
+        speakWithBrowserTTS(fallbackText);
+      } else if (!isMicMuted) {
+        setOrbState("listening", "Listening to your voice...");
+      }
+    };
+
+    const playPromise = currentAudio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(e => {
+        console.warn("[Audio] Autoplay blocked, falling back to browser speech synthesis:", e);
+        if (fallbackText) {
+          speakWithBrowserTTS(fallbackText);
+        } else if (!isMicMuted) {
+          setOrbState("listening", "Listening to your voice...");
+        }
+      });
     }
-  };
-
-  currentAudio.onerror = () => {
-    currentAudio = null;
-    if (!isMicMuted) {
-      setOrbState("listening", "Listening to your voice...");
+  } catch (err) {
+    console.warn("[Audio] Audio creation error:", err);
+    if (fallbackText) {
+      speakWithBrowserTTS(fallbackText);
     }
-  };
-
-  currentAudio.play().catch(e => {
-    console.warn("[Audio] Autoplay blocked, user interaction required:", e);
-    if (!isMicMuted) {
-      setOrbState("listening", "Listening to your voice...");
-    }
-  });
+  }
 }
 
 // =====================================================================
@@ -607,12 +682,17 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // If AI is currently speaking, user tap acts as barge-in: stop AI audio and ensure mic is active
-      if (currentAudio) {
-        try {
-          currentAudio.pause();
-          currentAudio.currentTime = 0;
-        } catch (e) {}
-        currentAudio = null;
+      if (currentAudio || (window.speechSynthesis && window.speechSynthesis.speaking)) {
+        if (currentAudio) {
+          try {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+          } catch (e) {}
+          currentAudio = null;
+        }
+        if (window.speechSynthesis) {
+          try { window.speechSynthesis.cancel(); } catch (e) {}
+        }
         if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ type: "barge_in" }));
         }
@@ -655,7 +735,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       customTextInput.value = "";
-      // Keep drawer open or hide based on user flow
       customTextInput.blur();
     });
   }
@@ -666,6 +745,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (currentAudio) {
         try { currentAudio.pause(); } catch(e) {}
         currentAudio = null;
+      }
+      if (window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch(e) {}
       }
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "barge_in" }));

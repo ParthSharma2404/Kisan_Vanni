@@ -55,18 +55,7 @@ class GnaniTTSService:
             except Exception as e:
                 print(f"[GnaniTTS] Error connecting to Timbre TTS API: {e}")
 
-        # Fallback tone if no key provided yet
-        return self._generate_fallback_wav(duration_seconds=1.0)
-
-    def _generate_fallback_wav(self, duration_seconds: float = 1.0) -> bytes:
-        buf = io.BytesIO()
-        sample_rate = 16000
-        n_samples = int(sample_rate * duration_seconds)
-        with wave.open(buf, 'wb') as wav_file:
-            wav_file.setnchannels(1)
-            wav_file.setsampwidth(2)
-            wav_file.setframerate(sample_rate)
-            wav_file.writeframes(b'\x00\x00' * n_samples)
-        return buf.getvalue()
+        # Return empty bytes on failure so frontend immediately speaks via Hindi SpeechSynthesis
+        return b""
 
 gnani_tts = GnaniTTSService()
