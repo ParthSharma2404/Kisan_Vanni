@@ -117,22 +117,19 @@ class LLMGenerateRequest(BaseModel):
     district: Optional[str] = "Nashik"
     crops: Optional[list] = None
 
-@app.post("/api/llm/generate")
-async def generate_llm_response(req: LLMGenerateRequest):
-    """
-    Direct endpoint for Gnani Evon v3.3 Sovereign LLM Indic reasoning.
-    """
-    answer = await llm_service.generate_response(
-        user_query=req.query,
-        farmer_name=req.farmer_name or "Kisan Bhai",
-        village=req.village or "",
-        district=req.district or "Nashik",
-        crops=req.crops or ["Pyaaz", "Tamatar"]
-    )
+class SummaryRequest(BaseModel):
+    session_id: str
+    phone_number: Optional[str] = ""
+
+@app.post("/api/session/whatsapp_summary")
+async def trigger_whatsapp_summary(req: SummaryRequest):
+    session = dialogue_manager.get_or_create_session(req.session_id)
+    if req.phone_number:
+        session.phone_number = req.phone_number
+    summary_data = dialogue_manager.generate_daily_crux_summary(session)
     return {
-        "query": req.query,
-        "response": answer,
-        "model": "Gnani Evon v3.3 Chat (luminenio/gnani-evon-v3.3-chat)"
+        "status": "success",
+        "summary": summary_data
     }
 
 # =====================================================================
@@ -387,7 +384,7 @@ async def dispatch_whatsapp(req: WhatsAppDispatchRequest):
 
     if not message_text:
         message_text = (
-            "🌾 *KISAN-VAANI MANDI & ADVISORY REPORT*\n"
+            "*KISAN-VAANI MANDI & ADVISORY REPORT*\n"
             "किसान भाई, आपकी फसल का आज का सर्वोत्तम मंडी भाव एवं ई-नाम अधिकार रिपोर्ट:\n\n"
             "• *सर्वोत्तम मंडी:* Lasalgaon APMC\n"
             "• *रेट:* ₹2,450 / क्विंटल\n"

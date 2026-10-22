@@ -291,35 +291,35 @@ class DialogueManager:
         location_display = f"{farmer.get('village', '')}, {farmer.get('district', '')}" if (farmer and farmer.get("village")) else session.location_name
 
         text = (
-            f"🌾 *KISAN-VAANI MANDI DISPATCH PASS* 🌾\n"
+            f"*KISAN-VAANI MANDI DISPATCH PASS*\n"
             f"Pass ID: #{dispatch_id} | eNAM Verified\n"
             f"----------------------------------------\n"
-            f"👨‍🌾 *Farmer:* {farmer_name} | {location_display}\n"
-            f"📱 *Mobile:* +91 {session.phone_number}\n"
-            f"📦 *Produce:* {(session.commodity or 'PRODUCE').upper()} ({session.quantity_quintals} Quintal)\n"
-            f"🚚 *Logistics:* {v_title}\n"
+            f"*Farmer:* {farmer_name} | {location_display}\n"
+            f"*Mobile:* +91 {session.phone_number}\n"
+            f"*Produce:* {(session.commodity or 'PRODUCE').upper()} ({session.quantity_quintals} Quintal)\n"
+            f"*Logistics:* {v_title}\n"
             f"----------------------------------------\n"
-            f"🏆 *RECOMMENDED APMC:* {best['mandi_name']} ({best['district']})\n"
-            f"📍 *Distance:* {best['distance_km']} km\n"
-            f"💰 *Modal Rate:* ₹{int(best['modal_price'])} / Quintal\n"
-            f"💵 *Gross Realization:* ₹{int(best['gross_revenue']):,}\n\n"
-            f"📉 *Itemized Cost Breakdown:*\n"
+            f"*RECOMMENDED APMC:* {best['mandi_name']} ({best['district']})\n"
+            f"*Distance:* {best['distance_km']} km\n"
+            f"*Modal Rate:* ₹{int(best['modal_price'])} / Quintal\n"
+            f"*Gross Realization:* ₹{int(best['gross_revenue']):,}\n\n"
+            f"*Itemized Cost Breakdown:*\n"
             f"  • Diesel/Transport: -₹{int(best['freight_cost']):,}\n"
             f"  • Statutory APMC Cess (1%): -₹{int(best['mandi_cess']):,}\n"
             f"  • Weighment & Hamali: -₹{int(best['hamali']):,}\n"
             f"  • Trader Commission: ₹0 (Illegal under eNAM Section 17)\n"
             f"----------------------------------------\n"
-            f"✅ *NET IN-HAND PROFIT:* ₹{int(best['net_in_hand']):,}\n"
-            f"📈 *Net Rate / Quintal:* ₹{int(best['net_rate_per_quintal'])}\n"
+            f"*NET IN-HAND PROFIT:* ₹{int(best['net_in_hand']):,}\n"
+            f"*Net Rate / Quintal:* ₹{int(best['net_rate_per_quintal'])}\n"
         )
         if runner_up and extra_profit > 0:
-            text += f"🌟 *Net Arbitrage Gain:* +₹{extra_profit:,} vs {runner_up['mandi_name']}\n"
+            text += f"*Net Arbitrage Gain:* +₹{extra_profit:,} vs {runner_up['mandi_name']}\n"
 
         text += (
             f"----------------------------------------\n"
-            f"⚖️ *eNAM Statutory Farmer Shield:*\n"
+            f"*eNAM Statutory Farmer Shield:*\n"
             f"Section 17: Commission strictly payable by buyer. Deducting 6-8% is a cognizable offence.\n"
-            f"📞 eNAM National Grievance: 1800-270-0224\n"
+            f"National Grievance Helpline: 1800-270-0224\n"
             f"Generated via Gnani.ai Sovereign Voice Intelligence."
         )
 
@@ -346,6 +346,86 @@ class DialogueManager:
             "net_rate_per_quintal": best["net_rate_per_quintal"],
             "extra_profit": extra_profit,
             "whatsapp_text": text,
+            "whatsapp_url": wa_url
+        }
+
+    def generate_daily_crux_summary(self, session: SessionState) -> Dict[str, Any]:
+        """
+        Extracts the crux of all conversations, mandi rates, and ICAR prescriptions
+        discussed today, and creates a consolidated official eNAM-certified WhatsApp receipt.
+        """
+        import datetime, random
+        today_str = datetime.date.today().strftime("%d %b %Y")
+        dispatch_id = f"KV-{random.randint(1000, 9999)}"
+        farmer_name = session.farmer_name or "Kisan Bhai"
+        loc = session.location_name or session.district or "India"
+
+        # 1. Mandi arbitrage or crop pricing summary
+        mandi_section = ""
+        if session.last_arbitrage_results:
+            best = session.last_arbitrage_results[0]
+            mandi_section = (
+                f"*Mandi Bhav & Arbitrage:*\n"
+                f"  • Recommended: {best.get('mandi_name')} (₹{int(best.get('modal_price', 0))}/qtl)\n"
+                f"  • Quantity: {session.quantity_quintals or 'Standard'} Quintals\n"
+                f"  • Net In-Hand: ₹{int(best.get('net_in_hand', 0)):,}\n"
+                f"  • eNAM Commission: 0% (Kanooni Adhikar)\n"
+            )
+        elif session.commodity:
+            mandi_section = (
+                f"*Fasal & Mandi Bhav:*\n"
+                f"  • Fasal: {session.commodity.capitalize()}\n"
+                f"  • Kshetr: {loc}\n"
+            )
+
+        # 2. Key advisory topics discussed from chat history
+        advisory_points = []
+        for msg in session.chat_history:
+            content = msg.get("content", "")
+            if any(term in content for term in ["वैज्ञानिक सलाह", "इलाज", "उपचार", "छिड़काव", "spray", "दवाई", "नियंत्रण"]):
+                sentences = content.split("।")
+                first_bullet = sentences[0].replace("Kisan Bhai ji!", "").strip()
+                if first_bullet and len(first_bullet) > 10:
+                    advisory_points.append(first_bullet[:120])
+
+        advisory_section = ""
+        if advisory_points:
+            unique_points = list(dict.fromkeys(advisory_points))[:2]
+            advisory_section = "*Krishi Doctor & Crop Health Advisory:*\n"
+            for pt in unique_points:
+                advisory_section += f"  • {pt}।\n"
+
+        # 3. Assemble clean consolidated WhatsApp message
+        summary_text = (
+            f"*KISAN-VAANI DAILY KRISHI SUMMARY*\n"
+            f"Date: {today_str} | ID: #{dispatch_id}\n"
+            f"----------------------------------------\n"
+            f"*Farmer:* {farmer_name} ({loc})\n"
+            f"*Mobile:* +91 {session.phone_number or 'Registered'}\n"
+            f"----------------------------------------\n"
+        )
+        if mandi_section:
+            summary_text += mandi_section + "\n"
+        if advisory_section:
+            summary_text += advisory_section + "\n"
+
+        summary_text += (
+            f"*eNAM Statutory Guarantee:*\n"
+            f"Mandi commission is 0%. No aadhatiya can deduct commission from the farmer.\n"
+            f"National Grievance Helpline: 1800-270-0224\n"
+            f"----------------------------------------\n"
+            f"Generated via Gnani.ai Sovereign Voice Intelligence."
+        )
+
+        clean_phone = session.phone_number.replace("+91", "").replace(" ", "").strip()
+        encoded = urllib.parse.quote(summary_text)
+        wa_url = f"https://api.whatsapp.com/send?phone=91{clean_phone}&text={encoded}" if clean_phone else f"https://api.whatsapp.com/send?text={encoded}"
+
+        return {
+            "dispatch_id": dispatch_id,
+            "farmer_name": farmer_name,
+            "phone_number": session.phone_number,
+            "whatsapp_text": summary_text,
             "whatsapp_url": wa_url
         }
 

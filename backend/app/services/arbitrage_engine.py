@@ -134,35 +134,35 @@ class ArbitrageEngine:
         extra_profit = int(best["net_in_hand"] - runner_up["net_in_hand"]) if runner_up else 0
 
         text = (
-            f"🌾 *KISAN-VAANI MANDI DISPATCH SLIP* 🌾\n"
+            f"*KISAN-VAANI MANDI DISPATCH SLIP*\n"
             f"----------------------------------------\n"
-            f"👨‍🌾 *Farmer:* {farmer_name} | {location}\n"
-            f"📦 *Produce:* {commodity.upper()} ({quantity_quintals} Quintal)\n"
-            f"🚚 *Logistics:* {transport_mode}\n"
+            f"*Farmer:* {farmer_name} | {location}\n"
+            f"*Produce:* {commodity.upper()} ({quantity_quintals} Quintal)\n"
+            f"*Logistics:* {transport_mode}\n"
             f"----------------------------------------\n"
-            f"🏆 *RECOMMENDED MANDI:* {best['mandi_name']} ({best['district']})\n"
-            f"📍 *Distance:* {best['distance_km']} km\n"
-            f"💰 *Mandi Modal Rate:* ₹{int(best['modal_price'])} / Quintal\n"
-            f"💵 *Gross Realization:* ₹{int(best['gross_revenue'])}\n\n"
-            f"📉 *Itemized Deductions:*\n"
+            f"*RECOMMENDED MANDI:* {best['mandi_name']} ({best['district']})\n"
+            f"*Distance:* {best['distance_km']} km\n"
+            f"*Mandi Modal Rate:* ₹{int(best['modal_price'])} / Quintal\n"
+            f"*Gross Realization:* ₹{int(best['gross_revenue'])}\n\n"
+            f"*Itemized Deductions:*\n"
             f"  • Diesel/Freight: -₹{int(best['freight_cost'])}\n"
             f"  • Statutory APMC Cess (1%): -₹{int(best['mandi_cess'])}\n"
             f"  • Handling / Hamali: -₹{int(best['hamali'])}\n"
             f"  • Trader Commission (Aadhatiya): ₹0 (Illegal under eNAM)\n"
             f"----------------------------------------\n"
-            f"✅ *NET IN-HAND PROFIT:* ₹{int(best['net_in_hand'])}\n"
-            f"📈 *Net Rate / Quintal:* ₹{int(best['net_rate_per_quintal'])}\n"
+            f"*NET IN-HAND PROFIT:* ₹{int(best['net_in_hand'])}\n"
+            f"*Net Rate / Quintal:* ₹{int(best['net_rate_per_quintal'])}\n"
         )
 
         if runner_up and extra_profit > 0:
-            text += f"🌟 *Arbitrage Gain:* +₹{extra_profit} compared to {runner_up['mandi_name']}\n"
+            text += f"*Arbitrage Gain:* +₹{extra_profit} compared to {runner_up['mandi_name']}\n"
 
         text += (
             f"----------------------------------------\n"
-            f"⚖️ *eNAM Legal Rights Reminder:*\n"
+            f"*eNAM Legal Rights Reminder:*\n"
             f"Under APMC Model Act, commission is strictly payable by the buyer. "
             f"Do not allow middleman to deduct 5-8% from your sale proceeds!\n"
-            f"📞 Helpline: 1800-270-0224 (eNAM National Portal)\n"
+            f"Helpline: 1800-270-0224 (eNAM National Portal)\n"
             f"Generated via Gnani.ai Sovereign Voice Intelligence."
         )
 

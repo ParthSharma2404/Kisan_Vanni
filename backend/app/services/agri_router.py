@@ -100,6 +100,31 @@ class AgriAgentRouter:
         enriched_text = self.resolve_contextual_pronouns(raw_text, session)
         clean = enriched_text.lower()
 
+        # Check for Daily Crux Summary Request (End of conversation or explicit request)
+        summary_triggers = [
+            "summary", "whatsapp summary", "hisaab bhej do", "saara hisaab", "whatsapp par bhej do",
+            "parcha bhej do", "rasid bhej do", "done from my side", "done for today", "send to whatsapp",
+            "समरी", "व्हाट्सएप समरी", "व्हाट्सएप पर भेज दो", "हिसाब भेजो", "पर्चा भेजो", "आज का हिसाब"
+        ]
+        if any(w in clean for w in summary_triggers):
+            from app.services.dialogue_manager import dialogue_manager
+            summary_res = dialogue_manager.generate_daily_crux_summary(session)
+            spoken = (
+                f"Ji {f_name} bhai! Maine aaj ki poori baat-cheet, mandi bhav aur krishi salah ka crux "
+                f"aapke WhatsApp number (+91 {session.phone_number or 'mobile'}) ke liye taiyar kar diya hai!"
+            )
+            return {
+                "spoken_text": spoken,
+                "step": "DAILY_SUMMARY_DELIVERED",
+                "data": {
+                    "whatsapp_dispatched": True,
+                    "whatsapp_url": summary_res["whatsapp_url"],
+                    "whatsapp_text": summary_res["whatsapp_text"],
+                    "phone_number": session.phone_number,
+                    "dispatch_id": summary_res["dispatch_id"]
+                }
+            }
+
         # 3. TOOL A: Mandi Price / Rate / Market Arbitrage Tool
         is_mandi_query = any(w in clean for w in [
             "bhav", "rate", "bhav kya", "rate kya", "kimat", "mandi", "mandi bhav", "aaj ka rate",
