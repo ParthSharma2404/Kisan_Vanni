@@ -32,6 +32,12 @@ class SessionState:
         self.step: str = "ACTIVE"
         self.last_arbitrage_results: List[Dict[str, Any]] = []
         self.mandi_slip: Optional[Dict[str, Any]] = None
+        self.chat_history: List[Dict[str, str]] = []  # Rolling Buffer Window Memory (max 6 exchanges)
+
+    def add_history(self, role: str, content: str):
+        self.chat_history.append({"role": role, "content": content})
+        if len(self.chat_history) > 6:
+            self.chat_history = self.chat_history[-6:]
 
 class DialogueManager:
     def __init__(self):
@@ -48,10 +54,11 @@ class DialogueManager:
 
     async def process_utterance(self, session_id: str, utterance: str) -> Dict[str, Any]:
         """
-        Streamlined, dynamic Indic conversational intelligence pipeline:
-        User Utterance (STT) -> Agri-Intelligence / Mandi Arbitrage -> Timbre Voice (TTS)
+        Streamlined Agentic Conversational Intelligence Pipeline:
+        User Utterance (STT) -> Rolling Buffer Memory -> Agri-Router (Guardrails + Tools) -> Timbre Voice (TTS)
         """
         session = self.get_or_create_session(session_id)
+        session.add_history("user", utterance)
         text = utterance.strip().lower()
 
         # 1. Direct WhatsApp Dispatch Request
@@ -68,6 +75,7 @@ class DialogueManager:
                     f"Ji {session.farmer_name} bhai, maine {best_name} ka poora hisaab, "
                     f"diesel kharcha aur eNAM kanoon ka slip aapke WhatsApp number (+91 {session.phone_number}) par turant bhej diya hai!"
                 )
+                session.add_history("assistant", spoken)
                 return {
                     "spoken_text": spoken,
                     "step": "FINISHED",
@@ -84,10 +92,16 @@ class DialogueManager:
         # 2. Check for Contextual Distance / Nearest Mandi Questions
         distance_query = self._handle_distance_or_mandi_query(session, text)
         if distance_query:
+            if distance_query.get("spoken_text"):
+                session.add_history("assistant", distance_query["spoken_text"])
             return distance_query
 
-        # 3. Dynamic Sovereign Agri-Intelligence Engine (Location discovery, regional mandis, ICAR crop doctor, eNAM, schemes)
-        return agri_engine.analyze_and_respond(utterance, session)
+        # 3. Agentic Agricultural Router (Guardrails + Dynamic Tool Routing + Rolling Memory)
+        from app.services.agri_router import agri_router
+        res = agri_router.route_and_execute(utterance, session)
+        if res and res.get("spoken_text"):
+            session.add_history("assistant", res["spoken_text"])
+        return res
 
 
     async def _dispatch_whatsapp_background(self, phone: str, message_text: str) -> Dict[str, Any]:
