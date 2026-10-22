@@ -452,7 +452,7 @@ html, body {
   position: relative;
   z-index: 5;
   box-shadow: 0 0 24px var(--neon-lime-glow);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .dock-mic-neon:hover {
@@ -464,9 +464,24 @@ html, body {
   transform: scale(0.96);
 }
 
+/* Clear Muted / Off State */
+.dock-mic-neon.muted {
+  background-color: #1a1b22;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  color: #ef4444;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.dock-mic-neon.muted:hover {
+  background-color: #24252f;
+  border-color: rgba(239, 68, 68, 0.4);
+  transform: scale(1.04);
+}
+
 .mic-icon-svg {
   width: 28px;
   height: 28px;
+  display: block;
 }
 
 /* Concentric Acoustic Ripples */
@@ -475,7 +490,7 @@ html, body {
   border-radius: 50%;
   border: 1.5px solid rgba(204, 255, 0, 0.4);
   pointer-events: none;
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 .acoustic-ripple-ring.ring-1 {
@@ -499,71 +514,93 @@ html, body {
   animation: acousticRing 2.2s infinite ease-out 1.2s;
 }
 
+/* Hide ripples completely when muted */
+.mic-cluster.muted .acoustic-ripple-ring {
+  opacity: 0;
+  animation: none;
+  visibility: hidden;
+}
+
 @keyframes acousticRing {
   0% { transform: scale(0.9); opacity: 0.8; }
   100% { transform: scale(1.15); opacity: 0; }
 }
 
 /* ---------------------------------------------------------------------
-   5. QUICK PROMPTS DRAWER
+   5. CUSTOM TEXT INPUT DRAWER (Direct Question Typing, No Preset Chips)
    --------------------------------------------------------------------- */
-.quick-chips-drawer {
+.custom-input-drawer {
   width: 100%;
-  animation: drawerFade 0.2s ease-out;
+  animation: drawerFade 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 4px 6px 0 6px;
 }
 
 @keyframes drawerFade {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.chips-scroll-row {
+.custom-text-box {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 8px 4px 4px 4px;
-  scrollbar-width: none;
+  align-items: center;
+  background: #14151b;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 28px;
+  padding: 6px 8px 6px 18px;
+  gap: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.chips-scroll-row::-webkit-scrollbar {
-  display: none;
+.custom-text-box:focus-within {
+  border-color: var(--neon-lime);
+  box-shadow: 0 0 16px var(--neon-lime-glow);
 }
 
-.voice-chip {
-  flex-shrink: 0;
-  background: #14151a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #e4e4e7;
-  padding: 8px 14px;
-  border-radius: 20px;
-  font-size: 13px;
+.custom-text-box input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 14px;
+  font-family: inherit;
   font-weight: 500;
+}
+
+.custom-text-box input::placeholder {
+  color: #71717a;
+  font-size: 13px;
+}
+
+.btn-send-text {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--neon-lime);
+  color: #070707;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s ease;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, background-color 0.2s ease;
 }
 
-.voice-chip:hover {
-  background: #20222a;
-  border-color: rgba(255, 255, 255, 0.2);
+.btn-send-text:hover {
+  background: var(--neon-lime-dark);
+  transform: scale(1.06);
 }
 
-.voice-chip.highlight-lime {
-  background: rgba(204, 255, 0, 0.15);
-  border-color: rgba(204, 255, 0, 0.4);
-  color: var(--neon-lime);
-}
-
-.voice-chip.highlight-wa {
-  background: rgba(37, 211, 102, 0.15);
-  border-color: rgba(37, 211, 102, 0.4);
-  color: #25d366;
+.btn-send-text:active {
+  transform: scale(0.94);
 }
 
 /* ---------------------------------------------------------------------
-   6. ONBOARDING MODAL & SETTINGS
+   6. ONBOARDING MODAL
    --------------------------------------------------------------------- */
-.mobile-entry-overlay, .modal-overlay {
+.mobile-entry-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.85);
@@ -583,7 +620,7 @@ html, body {
   display: none !important;
 }
 
-.mobile-entry-sheet, .modal-card {
+.mobile-entry-sheet {
   width: 100%;
   max-width: 380px;
   background: #121217;
@@ -651,7 +688,7 @@ html, body {
   font-family: inherit;
 }
 
-.btn-neon-start, .btn-neon-save {
+.btn-neon-start {
   width: 100%;
   background: var(--neon-lime);
   color: #070707;
@@ -666,41 +703,7 @@ html, body {
   margin-top: 10px;
 }
 
-.btn-neon-start:active, .btn-neon-save:active {
+.btn-neon-start:active {
   transform: scale(0.97);
 }
 
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.btn-close-modal {
-  background: transparent;
-  border: none;
-  font-size: 24px;
-  color: #a1a1aa;
-  cursor: pointer;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.form-group label {
-  font-size: 12px;
-  color: #a1a1aa;
-}
-
-.form-group input {
-  background: #1a1a22;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 10px 12px;
-  color: #ffffff;
-  outline: none;
-}

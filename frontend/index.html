@@ -24,16 +24,14 @@
   <div class="app-viewport">
     <!-- Top Bar: Pill Tag & Online Indicator -->
     <header class="top-nav-bar">
-      <div class="top-meta-left">
-        <button id="settingsBtn" class="subtle-gear-btn" title="Settings" aria-label="Settings">⚙️</button>
-      </div>
+      <div class="top-meta-left"></div>
 
       <div class="top-center-brand">
         <div class="ai-buddy-pill">
           <span class="pill-title">AI Buddy</span>
         </div>
         <div class="ai-buddy-status">
-          <span class="status-pulse-dot"></span>
+          <span class="status-pulse-dot" id="globalStatusDot"></span>
           <span id="activeFarmerSubtext">Online</span>
         </div>
       </div>
@@ -85,31 +83,33 @@
     <!-- Bottom Dock: Clean & Minimalist (Screenshot 5 Match) -->
     <footer class="bottom-dock" id="voiceDock">
       <div class="dock-row">
-        <!-- Left: Quick Prompts / Keyboard -->
-        <button id="toggleChipsBtn" class="dock-side-btn" title="Quick Prompts" aria-label="Quick Prompts">
+        <!-- Left: Keyboard toggle for typing custom question directly (no pre-feeded chips) -->
+        <button id="toggleKeyboardBtn" class="dock-side-btn" title="Type Question" aria-label="Type Question">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="4" width="20" height="16" rx="4"/>
             <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/>
           </svg>
         </button>
 
-        <!-- Center: Vibrant Neon Lime Mic with Soundwave Ripple Rings -->
-        <div class="mic-cluster">
-          <div class="acoustic-ripple-ring ring-3"></div>
-          <div class="acoustic-ripple-ring ring-2"></div>
-          <div class="acoustic-ripple-ring ring-1"></div>
-          <button id="mainMicBtn" class="dock-mic-neon active" title="Tap to talk" aria-label="Microphone">
-            <svg class="mic-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
+        <!-- Center: Vibrant Neon Lime Mic with Soundwave Ripple Rings & Clear Toggle State -->
+        <div class="mic-cluster" id="micCluster">
+          <div class="acoustic-ripple-ring ring-3" id="rippleRing3"></div>
+          <div class="acoustic-ripple-ring ring-2" id="rippleRing2"></div>
+          <div class="acoustic-ripple-ring ring-1" id="rippleRing1"></div>
+          <button id="mainMicBtn" class="dock-mic-neon active" title="Tap to pause / speak" aria-label="Microphone">
+            <span id="micIconHolder">
+              <svg class="mic-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </span>
           </button>
         </div>
 
-        <!-- Right: Close / Reset Action -->
-        <button id="resetCallBtn" class="dock-side-btn" title="Reset / Close" aria-label="Reset">
+        <!-- Right: Stop playback / Pause mic -->
+        <button id="resetCallBtn" class="dock-side-btn" title="Stop &amp; Mute" aria-label="Stop &amp; Mute">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -117,18 +117,22 @@
         </button>
       </div>
 
-      <!-- Collapsible Quick Prompts Drawer -->
-      <div class="quick-chips-drawer" id="quickChipsDrawer" style="display: none;">
-        <div class="chips-scroll-row">
-          <button class="voice-chip highlight-lime" data-text="मेरे को बताओ कि मार्केट में टमाटर का भाव क्या चल रहा है">🍅 टमाटर का भाव</button>
-          <button class="voice-chip" data-text="पंजाब से हूँ और मुझे टमाटर की फसल बेचनी है।">📍 पंजाब से टमाटर बेचना</button>
-          <button class="voice-chip" data-text="व्हाट्सएप का क्या यूज है">📲 व्हाट्सएप का क्या यूज है?</button>
-          <button class="voice-chip" data-text="प्याज का ताजा मंडी भाव बताओ">🧅 प्याज का ताजा भाव</button>
-          <button class="voice-chip" data-text="मेरे पास 40 कट्टे प्याज है, गाड़ी मेरी अपनी बोलेरो पिकअप है">🚚 40 कट्टे + अपनी पिकअप</button>
-          <button class="voice-chip" data-text="आढ़तिया 6 परसेंट कमीशन मांग रहा है, क्या करूं?">🛡️ eNAM 0% कमीशन</button>
-          <button class="voice-chip" data-text="टमाटर के पत्ते पीले पड़ रहे हैं और सिकुड़ रहे हैं">🌿 टमाटर में रोग की दवाई</button>
-          <button class="voice-chip highlight-wa" id="silentWaBtn">📲 WhatsApp Slip Bhejo</button>
-        </div>
+      <!-- Pure Text Input Drawer (NO pre-feeded chips; farmer types their own question) -->
+      <div class="custom-input-drawer" id="customInputDrawer" style="display: none;">
+        <form id="customTextForm" class="custom-text-box">
+          <input 
+            type="text" 
+            id="customTextInput" 
+            placeholder="Type any crop or mandi question in Hindi or English..." 
+            autocomplete="off"
+          >
+          <button type="submit" id="sendTextBtn" class="btn-send-text" aria-label="Send question">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
       </div>
     </footer>
   </div>
@@ -160,29 +164,6 @@
           Connect Voice Bot
         </button>
       </form>
-    </div>
-  </div>
-
-  <!-- SETTINGS MODAL -->
-  <div class="modal-overlay" id="settingsModal" style="display: none;">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Settings</h3>
-        <button id="closeSettingsBtn" class="btn-close-modal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="modalGnaniKey">Gnani.ai API Key:</label>
-          <input type="password" id="modalGnaniKey" placeholder="vach_..." autocomplete="off">
-        </div>
-        <div class="form-group">
-          <label for="modalPhoneChange">Farmer Phone Number:</label>
-          <input type="tel" id="modalPhoneChange" placeholder="9876543210" maxlength="10">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="saveSettingsBtn" class="btn-neon-save">Save &amp; Close</button>
-      </div>
     </div>
   </div>
 

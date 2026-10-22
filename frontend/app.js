@@ -11,7 +11,8 @@ let socket = null;
 let currentAudio = null;
 let animationId = null;
 
-// Web Audio & VAD Variables
+// Microphone & VAD State
+let isMicMuted = false;
 let audioContext = null;
 let mediaStream = null;
 let audioSource = null;
@@ -30,58 +31,129 @@ let ambientNoiseFloor = 0.012;
 const SILENCE_TIMEOUT_MS = 750;
 const MIN_SPEECH_DURATION_MS = 250;
 
+// SVG Icons for Active vs Muted Microphone
+const ACTIVE_MIC_SVG = `
+  <svg class="mic-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+    <line x1="12" y1="19" x2="12" y2="23"/>
+    <line x1="8" y1="23" x2="16" y2="23"/>
+  </svg>
+`;
+
+const MUTED_MIC_SVG = `
+  <svg class="mic-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="1" y1="1" x2="23" y2="23"></line>
+    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+    <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
+    <line x1="12" y1="19" x2="12" y2="23"></line>
+    <line x1="8" y1="23" x2="16" y2="23"></line>
+  </svg>
+`;
+
 // DOM Elements
 const orbContainer = document.getElementById("orbContainer");
 const voiceOrb = document.getElementById("voiceOrb");
 const voiceStatePill = document.getElementById("voiceStatePill");
 const voiceStateText = document.getElementById("voiceStateText");
 const voiceCaption = document.getElementById("voiceCaption");
+const micCluster = document.getElementById("micCluster");
 const mainMicBtn = document.getElementById("mainMicBtn");
-const toggleChipsBtn = document.getElementById("toggleChipsBtn");
-const quickChipsDrawer = document.getElementById("quickChipsDrawer");
-const silentWaBtn = document.getElementById("silentWaBtn");
+const micIconHolder = document.getElementById("micIconHolder");
+const toggleKeyboardBtn = document.getElementById("toggleKeyboardBtn");
+const customInputDrawer = document.getElementById("customInputDrawer");
+const customTextForm = document.getElementById("customTextForm");
+const customTextInput = document.getElementById("customTextInput");
 const waFloatingToast = document.getElementById("waFloatingToast");
 const waToastMsg = document.getElementById("waToastMsg");
 const waToastLink = document.getElementById("waToastLink");
 const topPhoneBadge = document.getElementById("topPhoneBadge");
 const topPhoneText = document.getElementById("topPhoneText");
 const activeFarmerSubtext = document.getElementById("activeFarmerSubtext");
+const globalStatusDot = document.getElementById("globalStatusDot");
 const resetCallBtn = document.getElementById("resetCallBtn");
 
-// Onboarding & Settings Sheets
+// Onboarding Modal
 const mobileEntryOverlay = document.getElementById("mobileEntryOverlay");
 const mobileEntryForm = document.getElementById("mobileEntryForm");
 const farmerPhoneInput = document.getElementById("farmerPhoneInput");
-const settingsBtn = document.getElementById("settingsBtn");
-const settingsModal = document.getElementById("settingsModal");
-const closeSettingsBtn = document.getElementById("closeSettingsBtn");
-const saveSettingsBtn = document.getElementById("saveSettingsBtn");
-const modalGnaniKey = document.getElementById("modalGnaniKey");
-const modalPhoneChange = document.getElementById("modalPhoneChange");
 
 // =====================================================================
-// 1. ORB STATE & VISUAL EFFECTS (Screenshot 5 Match)
+// 1. MIC STATE TOGGLE (Clear Listening vs Muted Distinction)
+// =====================================================================
+function setMicMuted(muted) {
+  isMicMuted = muted;
+
+  if (isMicMuted) {
+    // Microphone is now Muted / Paused
+    isSpeaking = false;
+    audioBufferChunks = [];
+    preRollBuffer = [];
+
+    if (micCluster) micCluster.classList.add("muted");
+    if (mainMicBtn) {
+      mainMicBtn.className = "dock-mic-neon muted";
+      mainMicBtn.setAttribute("title", "Microphone paused. Tap to speak");
+    }
+    if (micIconHolder) micIconHolder.innerHTML = MUTED_MIC_SVG;
+
+    if (globalStatusDot) {
+      globalStatusDot.style.backgroundColor = "#ef4444";
+      globalStatusDot.style.boxShadow = "0 0 8px rgba(239, 68, 68, 0.5)";
+    }
+    if (activeFarmerSubtext) activeFarmerSubtext.innerText = "Paused • Tap mic to speak";
+
+    updateCaption("Microphone paused. Tap the microphone button when you want to speak.");
+    if (voiceOrb) voiceOrb.style.transform = "scale(1)";
+  } else {
+    // Microphone is now Active & Listening
+    audioBufferChunks = [];
+    preRollBuffer = [];
+    silenceStartTime = 0;
+    speechStartTime = 0;
+
+    if (micCluster) micCluster.classList.remove("muted");
+    if (mainMicBtn) {
+      mainMicBtn.className = "dock-mic-neon active";
+      mainMicBtn.setAttribute("title", "Listening. Tap to pause microphone");
+    }
+    if (micIconHolder) micIconHolder.innerHTML = ACTIVE_MIC_SVG;
+
+    if (globalStatusDot) {
+      globalStatusDot.style.backgroundColor = "var(--neon-lime)";
+      globalStatusDot.style.boxShadow = "0 0 10px var(--neon-lime-glow)";
+    }
+    if (activeFarmerSubtext) activeFarmerSubtext.innerText = "Listening to your voice...";
+
+    updateCaption("Listening... Ask about any crop, mandi rates, or agriculture advisory.");
+  }
+}
+
+// =====================================================================
+// 2. ORB STATE & VISUAL EFFECTS
 // =====================================================================
 function setOrbState(state, customMessage = "") {
   if (orbContainer) {
     orbContainer.className = "sphere-wrapper";
   }
 
-  if (activeFarmerSubtext && customMessage) {
+  if (activeFarmerSubtext && customMessage && !isMicMuted) {
     if (state === "farmer_speaking") {
       activeFarmerSubtext.innerText = "Listening to you...";
     } else if (state === "reasoning") {
       activeFarmerSubtext.innerText = "AI Buddy reasoning...";
     } else if (state === "speaking" || state === "agent_speaking") {
-      activeFarmerSubtext.innerText = "Speaking (speak anytime)";
+      activeFarmerSubtext.innerText = "Speaking (speak anytime to barge-in)";
     } else {
       activeFarmerSubtext.innerText = "Online";
     }
   }
 
+  if (isMicMuted) return;
+
   switch (state) {
     case "idle":
-      if (mainMicBtn) mainMicBtn.className = "dock-mic-neon";
+      if (mainMicBtn) mainMicBtn.className = "dock-mic-neon active";
       break;
 
     case "listening":
@@ -100,7 +172,6 @@ function setOrbState(state, customMessage = "") {
     case "speaking":
     case "agent_speaking":
       if (orbContainer) orbContainer.classList.add("speaking");
-      if (mainMicBtn) mainMicBtn.className = "dock-mic-neon";
       break;
   }
 }
@@ -111,11 +182,11 @@ function updateCaption(text) {
   setTimeout(() => {
     voiceCaption.innerText = `"${text}"`;
     voiceCaption.style.opacity = "1";
-  }, 120);
+  }, 100);
 }
 
 // =====================================================================
-// 2. FULL-DUPLEX WEBSOCKET CLIENT
+// 3. FULL-DUPLEX WEBSOCKET CLIENT
 // =====================================================================
 function connectWebSocket(phone) {
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -148,16 +219,19 @@ function connectWebSocket(phone) {
 
     socket.onclose = () => {
       console.log("[WebSocket] Connection closed");
-      setOrbState("idle", "Voice connection ended");
+      if (!isMicMuted) {
+        setOrbState("idle", "Voice connection ended");
+      }
     };
 
     socket.onerror = (err) => {
       console.warn("[WebSocket] Error connecting to server:", err);
-      setOrbState("listening", "Offline Demo Mode: Tap quick chips or mic");
+      if (!isMicMuted) {
+        setOrbState("listening", "Online");
+      }
     };
   } catch (e) {
     console.warn("[WebSocket] Connection init error:", e);
-    setOrbState("listening", "Demo Mode: Speak or tap chips");
   }
 }
 
@@ -166,11 +240,11 @@ function handleServerEvent(data) {
 
   if (type === "call_connected") {
     isCallActive = true;
-    setOrbState("idle", "Voice line connected");
+    setMicMuted(false);
     if (data.farmer_profile && data.farmer_profile.name) {
       activeFarmerSubtext.innerText = `Connected: ${data.farmer_profile.name} (${data.farmer_profile.village || 'Field'})`;
     } else {
-      activeFarmerSubtext.innerText = "New Farmer • Conversational Profile Setup";
+      activeFarmerSubtext.innerText = "Voice line active • Listening";
     }
   }
 
@@ -236,22 +310,28 @@ function playAgentAudio(base64Wav) {
 
   currentAudio.onended = () => {
     currentAudio = null;
-    setOrbState("listening", "Listening to your voice...");
+    if (!isMicMuted) {
+      setOrbState("listening", "Listening to your voice...");
+    }
   };
 
   currentAudio.onerror = () => {
     currentAudio = null;
-    setOrbState("listening", "Listening to your voice...");
+    if (!isMicMuted) {
+      setOrbState("listening", "Listening to your voice...");
+    }
   };
 
   currentAudio.play().catch(e => {
-    console.warn("[Audio] Autoplay blocked, tap screen to unlock audio:", e);
-    setOrbState("listening", "Tap microphone to speak");
+    console.warn("[Audio] Autoplay blocked, user interaction required:", e);
+    if (!isMicMuted) {
+      setOrbState("listening", "Listening to your voice...");
+    }
   });
 }
 
 // =====================================================================
-// 3. MICROPHONE & REAL-TIME CLIENT VAD WITH BARGE-IN
+// 4. MICROPHONE & REAL-TIME CLIENT VAD WITH BARGE-IN
 // =====================================================================
 async function startMicrophone() {
   try {
@@ -287,17 +367,22 @@ async function startMicrophone() {
     audioProcessor.onaudioprocess = handleAudioProcess;
 
     startOrbVisualizer();
-    setOrbState("listening", "Microphone active. Speak anytime.");
+    setMicMuted(false);
     return true;
   } catch (err) {
     console.warn("[Mic] Microphone access error:", err);
-    updateCaption("Microphone ready. Tap quick prompts or speak.");
-    setOrbState("listening", "Microphone ready");
+    updateCaption("Microphone ready. Type questions using keyboard or tap mic to allow.");
+    setMicMuted(true);
     return false;
   }
 }
 
 function handleAudioProcess(event) {
+  // If user paused/muted the microphone, do NOT process or send any audio!
+  if (isMicMuted) {
+    return;
+  }
+
   const inputData = event.inputBuffer.getChannelData(0);
   let sum = 0;
   for (let i = 0; i < inputData.length; i++) {
@@ -368,6 +453,11 @@ function handleAudioProcess(event) {
 }
 
 function commitRecordedSpeech() {
+  if (isMicMuted) {
+    audioBufferChunks = [];
+    return;
+  }
+
   // Reject ultra-short clicks or noise blips (< 280ms)
   if (audioBufferChunks.length < 4) {
     audioBufferChunks = [];
@@ -433,7 +523,7 @@ function encodeWAV(chunks, sampleRate) {
 // Fluid Orb dynamic audio visualizer
 function startOrbVisualizer() {
   function render() {
-    if (analyser && freqByteData) {
+    if (analyser && freqByteData && !isMicMuted) {
       analyser.getByteFrequencyData(freqByteData);
       let sum = 0;
       for (let i = 0; i < 32; i++) {
@@ -452,14 +542,15 @@ function startOrbVisualizer() {
 }
 
 // =====================================================================
-// 4. FLOATING WHATSAPP DISPATCH TOAST
+// 5. FLOATING WHATSAPP DISPATCH TOAST
 // =====================================================================
 function showWhatsAppToast(phone, linkUrl) {
+  if (!waToastMsg || !waFloatingToast) return;
   waToastMsg.innerText = `Advisory delivered to WhatsApp (+91 ${phone})`;
-  if (linkUrl) {
+  if (linkUrl && waToastLink) {
     waToastLink.href = linkUrl;
     waToastLink.style.display = "inline-block";
-  } else {
+  } else if (waToastLink) {
     waToastLink.style.display = "none";
   }
 
@@ -470,59 +561,106 @@ function showWhatsAppToast(phone, linkUrl) {
 }
 
 // =====================================================================
-// 5. EVENT LISTENERS & USER INTERACTIONS
+// 6. EVENT LISTENERS & USER INTERACTIONS
 // =====================================================================
 document.addEventListener("DOMContentLoaded", () => {
   // Mobile entry sheet submission
-  mobileEntryForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const phone = farmerPhoneInput.value.replace(/[^0-9]/g, "");
-    if (phone.length !== 10) {
-      alert("Kripya 10-digit mobile number darj karein.");
-      return;
-    }
+  if (mobileEntryForm) {
+    mobileEntryForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const phone = farmerPhoneInput.value.replace(/[^0-9]/g, "");
+      if (phone.length !== 10) {
+        alert("Kripya 10-digit mobile number darj karein.");
+        return;
+      }
 
-    activePhoneNumber = phone;
-    topPhoneText.innerText = `+91 ${phone}`;
-    topPhoneBadge.style.display = "flex";
+      activePhoneNumber = phone;
+      if (topPhoneText) topPhoneText.innerText = `+91 ${phone}`;
+      if (topPhoneBadge) topPhoneBadge.style.display = "flex";
 
-    // Glide away onboarding sheet
-    mobileEntryOverlay.classList.add("hidden-glide");
-    mobileEntryOverlay.style.display = "none";
+      // Glide away onboarding sheet
+      mobileEntryOverlay.classList.add("hidden-glide");
+      mobileEntryOverlay.style.display = "none";
 
-    // Start Audio & Connect
-    await startMicrophone();
-    connectWebSocket(phone);
-  });
+      // Start Audio & Connect
+      await startMicrophone();
+      connectWebSocket(phone);
+    });
+  }
 
   // Top phone badge to switch number
-  topPhoneBadge.addEventListener("click", () => {
-    mobileEntryOverlay.classList.remove("hidden-glide");
-    farmerPhoneInput.focus();
-  });
+  if (topPhoneBadge) {
+    topPhoneBadge.addEventListener("click", () => {
+      mobileEntryOverlay.classList.remove("hidden-glide");
+      mobileEntryOverlay.style.display = "flex";
+      farmerPhoneInput.focus();
+    });
+  }
 
-  // Main central mic button
-  mainMicBtn.addEventListener("click", async () => {
-    if (!audioContext) {
-      await startMicrophone();
-      connectWebSocket(activePhoneNumber);
-      return;
-    }
-
-    if (currentAudio) {
-      // Barge-in: User tapped mic while AI was speaking
-      currentAudio.pause();
-      currentAudio = null;
-      setOrbState("listening", "AI interrupted. Speak now.");
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "speech_start" }));
+  // Main central mic button: CLEAR TOGGLE ON / OFF
+  if (mainMicBtn) {
+    mainMicBtn.addEventListener("click", async () => {
+      if (!audioContext) {
+        await startMicrophone();
+        connectWebSocket(activePhoneNumber);
+        return;
       }
-    } else {
-      setOrbState("listening", "Listening to your voice...");
-    }
-  });
 
-  // Reset / Close call button
+      // If AI is currently speaking, user tap acts as barge-in: stop AI audio and ensure mic is active
+      if (currentAudio) {
+        try {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+        } catch (e) {}
+        currentAudio = null;
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: "barge_in" }));
+        }
+        setMicMuted(false);
+        setOrbState("listening", "AI interrupted. Speak now.");
+        return;
+      }
+
+      // Otherwise, toggle Mic state: Active <-> Muted
+      setMicMuted(!isMicMuted);
+    });
+  }
+
+  // Toggle keyboard drawer (for custom user-typed questions, NO prefeeded text)
+  if (toggleKeyboardBtn && customInputDrawer) {
+    toggleKeyboardBtn.addEventListener("click", () => {
+      const isVisible = customInputDrawer.style.display !== "none";
+      customInputDrawer.style.display = isVisible ? "none" : "block";
+      if (!isVisible && customTextInput) {
+        setTimeout(() => customTextInput.focus(), 100);
+      }
+    });
+  }
+
+  // Submit custom user typed question (NO pre-feeded chips)
+  if (customTextForm && customTextInput) {
+    customTextForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = customTextInput.value.trim();
+      if (!text) return;
+
+      updateCaption(text);
+      setOrbState("reasoning", "Analyzing your question...");
+
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+          type: "user_text",
+          text: text
+        }));
+      }
+
+      customTextInput.value = "";
+      // Keep drawer open or hide based on user flow
+      customTextInput.blur();
+    });
+  }
+
+  // Reset / Stop button: stops current AI playback and pauses mic
   if (resetCallBtn) {
     resetCallBtn.addEventListener("click", () => {
       if (currentAudio) {
@@ -532,71 +670,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "barge_in" }));
       }
-      updateCaption("Call reset. Tap the microphone anytime to speak.");
-      setOrbState("listening");
+      setMicMuted(true);
+      updateCaption("Call paused. Tap the microphone when you want to speak.");
     });
   }
-
-  // Toggle quick chips drawer
-  toggleChipsBtn.addEventListener("click", () => {
-    const isVisible = quickChipsDrawer.style.display !== "none";
-    quickChipsDrawer.style.display = isVisible ? "none" : "block";
-  });
-
-  // Quick scenario chips
-  document.querySelectorAll(".voice-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      const text = chip.getAttribute("data-text");
-      updateCaption(text);
-      setOrbState("reasoning", "Processing prompt...");
-
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({
-          type: "user_text",
-          text: text
-        }));
-      }
-    });
-  });
-
-  // Silent WhatsApp Dispatch Button
-  silentWaBtn.addEventListener("click", () => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({
-        type: "user_text",
-        text: "WhatsApp par digital slip bhej do"
-      }));
-    }
-  });
-
-  // Settings modal
-  settingsBtn.addEventListener("click", () => {
-    settingsModal.style.display = "flex";
-  });
-
-  closeSettingsBtn.addEventListener("click", () => {
-    settingsModal.style.display = "none";
-  });
-
-  saveSettingsBtn.addEventListener("click", async () => {
-    const key = modalGnaniKey.value.trim();
-    if (key) {
-      try {
-        await fetch(`${API_BASE}/api/config/key`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ api_key: key })
-        });
-      } catch (e) {}
-    }
-
-    const newPhone = modalPhoneChange.value.trim();
-    if (newPhone && newPhone.length === 10) {
-      activePhoneNumber = newPhone;
-      topPhoneText.innerText = `+91 ${newPhone}`;
-      connectWebSocket(newPhone);
-    }
-
-    settingsModal.style.display = "none";
-  });
 });
