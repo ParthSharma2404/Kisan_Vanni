@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: kisan-vaani
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: GNANI_TTS_API_URL
+        value: https://api.vachana.ai/api/v1/tts/inference
+      - key: GNANI_STT_API_URL
+        value: https://api.vachana.ai/stt/v3
+      - key: EVON_SPACE_ID
+        value: luminenio/gnani-evon-v3.3-chat
+      - key: GNANI_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: DATA_GOV_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false

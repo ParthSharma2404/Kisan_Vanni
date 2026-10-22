@@ -7,3 +7,6 @@ pydantic>=2.6.0
 python-dotenv>=1.0.1
 aiofiles>=23.2.1
 python-multipart>=0.0.32
+gradio_client>=1.0.0
+supabase>=2.0.0
+
