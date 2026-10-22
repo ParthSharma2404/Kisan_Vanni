@@ -1,0 +1,46 @@
+[
+  {
+    "crop": "Tomato",
+    "aliases": ["tamatar", "tamaatar", "tomato"],
+    "symptoms": ["yellow leaves", "curled leaves", "stunted growth", "patte mud rahe hain", "peele patte"],
+    "disease_name": "Tomato Leaf Curl Virus (ToLCV)",
+    "cause": "Whitefly vector (Bemisia tabaci)",
+    "organic_remedy": "Uproot and destroy heavily infected plants. Spray Neem Oil (5ml/litre water) mixed with mild soap solution to repel whiteflies. Install yellow sticky traps.",
+    "chemical_remedy": "Spray Imidacloprid 17.8% SL @ 3ml per 10 litres of water, or Thiamethoxam 25% WG @ 4g per 10 litres water.",
+    "pre_harvest_interval_days": 5,
+    "spoken_advice_hi": "Tamatar ke patte mudna aur peele padna Leaf Curl Virus ke lakshan hain, jo safed makkhi se failta hai. Turant peele sticky trap lagayein aur Neem oil ka chhidkaav karein. Agar asar zyada hai toh Imidacloprid 3ml prati 10 litre paani me ghol kar chhidkein."
+  },
+  {
+    "crop": "Onion",
+    "aliases": ["pyaaz", "kanda", "pyaj", "onion", "erulli"],
+    "symptoms": ["purple spots on leaves", "leaf drying from tip", "patte upar se sukh rahe hain", "baingani dhabbe"],
+    "disease_name": "Purple Blotch (Alternaria porri)",
+    "cause": "Fungal pathogen aggravated by humid cloudy weather",
+    "organic_remedy": "Ensure proper drainage, avoid overhead irrigation, and spray Trichoderma viride @ 5g/litre water.",
+    "chemical_remedy": "Spray Mancozeb 75% WP @ 2.5g/litre water or Difenoconazole 25% EC @ 1ml/litre water.",
+    "pre_harvest_interval_days": 7,
+    "spoken_advice_hi": "Pyaaz ke patto par baingani dhabbe aur upar se sookhna Purple Blotch fungal bimari hai. Khet me paani na jamne dein. Mancozeb dhai gram prati litre paani me milakar chhidkaav karein."
+  },
+  {
+    "crop": "Wheat",
+    "aliases": ["gehun", "gehu", "wheat"],
+    "symptoms": ["yellow powdery pustules on leaves", "yellow stripes", "peela powder", "patte par dhaaridar dhabbe"],
+    "disease_name": "Yellow Rust / Stripe Rust (Puccinia striiformis)",
+    "cause": "Air-borne fungal spores in cool, humid temperatures",
+    "organic_remedy": "Monitor borders regularly. Ensure balanced nitrogen usage (avoid excess urea).",
+    "chemical_remedy": "Spray Propiconazole 25% EC (Tilt) @ 1ml per litre of water immediately upon first appearance.",
+    "pre_harvest_interval_days": 15,
+    "spoken_advice_hi": "Gehun ke patto par peela powder aana Yellow Rust (Pila Ratawa) hai. Isko turant rokna zaroori hai. Propiconazole ek ml prati litre paani me milakar chhidkein."
+  },
+  {
+    "crop": "Soyabean",
+    "aliases": ["soybean", "soya", "soyabean"],
+    "symptoms": ["yellow mosaic pattern", "leaves crinkled", "patte peele aur chitte padna"],
+    "disease_name": "Soybean Yellow Mosaic Virus",
+    "cause": "Transmitted by whitefly",
+    "organic_remedy": "Remove diseased plants immediately. Spray 5% Neem Seed Kernel Extract (NSKE).",
+    "chemical_remedy": "Spray Thiamethoxam 25 WG @ 40g per acre in 200 litres of water.",
+    "pre_harvest_interval_days": 10,
+    "spoken_advice_hi": "Soyabean me peela mosaic rog safed makkhi dwara failta hai. Grast paudho ko nikaal dein aur Neem ka ark ya Thiamethoxam 40 gram prati acre chhidkein."
+  }
+]

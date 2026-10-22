@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kisan-Vaani | Sovereign Voice Agri-Intelligence</title>
+  <meta name="description" content="Pure hands-free ChatGPT voice mode for Indian farmers. Real-time Mandi Arbitrage, eNAM legal rights and ICAR crop doctor powered by Gnani AI.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=4">
+</head>
+<body class="chatgpt-voice-body">
+  <div class="voice-app-wrapper">
+    <!-- Minimalist Top Navigation -->
+    <header class="voice-top-bar">
+      <div class="brand-cluster">
+        <div class="brand-leaf-icon">🌱</div>
+        <div>
+          <h1 class="voice-brand-title">Kisan-Vaani <span class="voice-model-pill">Gnani Timbre v3.0</span></h1>
+          <p class="voice-brand-tag" id="activeFarmerSubtext">Dial-in Sovereign Voice Intelligence</p>
+        </div>
+      </div>
+
+      <div class="top-controls">
+        <div class="phone-badge" id="topPhoneBadge" title="Click to change number" style="display: none;">
+          <span class="online-indicator"></span>
+          <span id="topPhoneText">+91 Mobile</span>
+        </div>
+        <button id="settingsBtn" class="icon-btn" title="Gnani AI & Supabase Settings" aria-label="Settings">
+          ⚙️
+        </button>
+      </div>
+    </header>
+
+    <!-- CENTERPIECE: Fluid Animated ChatGPT Voice Orb & Living Subtitles -->
+    <main class="voice-stage" id="voiceStage">
+      <!-- 1. The Living Voice Orb -->
+      <div class="orb-container" id="orbContainer">
+        <div class="orb-outer-glow" id="orbOuterGlow"></div>
+        <div class="orb-wave-ring ring-1" id="waveRing1"></div>
+        <div class="orb-wave-ring ring-2" id="waveRing2"></div>
+        <div class="orb-wave-ring ring-3" id="waveRing3"></div>
+        <div class="orb-core" id="voiceOrb">
+          <div class="orb-inner-fluid"></div>
+          <div class="orb-particle-mesh"></div>
+          <div class="orb-icon" id="orbIcon">🎙️</div>
+        </div>
+      </div>
+
+      <!-- Real-time Status / State Pill -->
+      <div class="voice-state-pill" id="voiceStatePill">
+        <span class="state-dot" id="stateDot"></span>
+        <span id="voiceStateText">Tap microphone to begin</span>
+      </div>
+
+      <!-- Subtitle & Caption Line (Single smooth distraction-free subtitle) -->
+      <div class="voice-caption-wrapper">
+        <p class="voice-caption" id="voiceCaption">
+          "Namaste Kisan Bhai! Enter your mobile number to speak with your personal mandi advisor."
+        </p>
+      </div>
+
+      <!-- Subtle background WhatsApp notification toast -->
+      <div class="wa-floating-toast" id="waFloatingToast" style="display: none;">
+        <span class="wa-toast-icon">📲</span>
+        <span class="wa-toast-msg" id="waToastMsg">Advisory delivered to WhatsApp</span>
+        <a id="waToastLink" href="#" target="_blank" rel="noopener noreferrer" class="wa-toast-btn">Open</a>
+      </div>
+    </main>
+
+    <!-- Minimalist Bottom Voice Dock -->
+    <footer class="voice-dock" id="voiceDock">
+      <div class="dock-actions">
+        <!-- Quick Prompts Toggle Button -->
+        <button id="toggleChipsBtn" class="dock-btn-secondary" title="Quick Prompts for Demo" aria-label="Quick Prompts">
+          <span class="icon">💬</span>
+          <span class="btn-label">Quick Prompts</span>
+        </button>
+
+        <!-- Central Mic Action Button -->
+        <button id="mainMicBtn" class="dock-mic-btn idle" title="Tap to talk" aria-label="Microphone">
+          <div class="mic-glow-ring"></div>
+          <span class="mic-icon" id="micIcon">🎙️</span>
+        </button>
+
+        <!-- Direct WhatsApp Dispatch Button -->
+        <button id="silentWaBtn" class="dock-btn-secondary" title="Dispatch Advisory to WhatsApp" aria-label="Send to WhatsApp">
+          <span class="icon">🟢</span>
+          <span class="btn-label">WhatsApp</span>
+        </button>
+      </div>
+
+      <!-- Collapsible Quick Scenario Chips (Subtle overlay for fast hands-free demo) -->
+      <div class="quick-chips-drawer" id="quickChipsDrawer" style="display: none;">
+        <div class="chips-scroll-row">
+          <button class="voice-chip" data-text="Mera naam Ankit hai, Shivrajpur gaon se">👋 New Farmer: "Ankit, Shivrajpur"</button>
+          <button class="voice-chip" data-text="Haan, main abhi bhi Shivrajpur gaon me hoon">📍 Confirm: "Haan Shivrajpur se"</button>
+          <button class="voice-chip" data-text="Nahi, abhi Nashik mandi me hoon">🔄 Move: "Abhi Nashik me hoon"</button>
+          <button class="voice-chip" data-text="Namaste bhaiya, kanda bechna tha, kya rate chal raha hai?">🧅 Ask Onion Rate</button>
+          <button class="voice-chip" data-text="Mere paas 40 katta pyaaz hai bechne ko">📦 40 Katte</button>
+          <button class="voice-chip" data-text="Ek katta 50 kilo ka bori hai">⚖️ 50 Kg Bori</button>
+          <button class="voice-chip" data-text="Gaadi meri apni hi Bolero pickup hai">🛻 Own Bolero Pickup</button>
+          <button class="voice-chip highlight-amber" data-text="Ruko bhaiya, par Lasalgaon kitna door hai?">⚡ Barge-in: "Lasalgaon kitna door hai?"</button>
+          <button class="voice-chip" data-text="Aadhatiya 6 percent commission maang raha hai, kya karun?">🛡️ eNAM 0% Commission</button>
+          <button class="voice-chip highlight-green" data-text="WhatsApp par digital slip bhej do">📲 "WhatsApp par slip bhej do"</button>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- SMOOTH ANIMATED MOBILE NUMBER ENTRY SHEET (Glassmorphic Onboarding Modal) -->
+  <div class="mobile-entry-overlay" id="mobileEntryOverlay">
+    <div class="mobile-entry-sheet" id="mobileEntrySheet">
+      <div class="sheet-ornament"></div>
+      <div class="sheet-header">
+        <div class="sheet-avatar">🌾</div>
+        <h2 class="sheet-title">Kisan-Vaani</h2>
+        <p class="sheet-subtitle">Sovereign Full-Duplex Voice Agri-Intelligence</p>
+      </div>
+
+      <p class="sheet-prompt">Apna 10-digit mobile number darj karein:</p>
+
+      <form id="mobileEntryForm" class="phone-input-group">
+        <div class="input-with-prefix">
+          <span class="country-prefix">🇮🇳 +91</span>
+          <input 
+            type="tel" 
+            id="farmerPhoneInput" 
+            placeholder="9876543210" 
+            pattern="[0-9]{10}" 
+            maxlength="10" 
+            required 
+            autocomplete="tel-national"
+            inputmode="numeric"
+          >
+        </div>
+
+        <button type="submit" id="startVoiceAssistantBtn" class="btn-start-voice">
+          <span>Start Kisan Call</span>
+          <span class="arrow-icon">→</span>
+        </button>
+      </form>
+
+      <div class="sheet-features">
+        <div class="feature-item">
+          <span class="f-icon">🎙️</span>
+          <span>Gnani Timbre v3.0 Vernacular Voice</span>
+        </div>
+        <div class="feature-item">
+          <span class="f-icon">⚖️</span>
+          <span>eNAM Zero-Commission Mandi Arbitrage</span>
+        </div>
+        <div class="feature-item">
+          <span class="f-icon">📲</span>
+          <span>Instant WhatsApp Advisory Dispatch</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL (GNANI KEY & SUPABASE) -->
+  <div class="modal-overlay" id="settingsModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon">⚙️</span>
+          <h3>Kisan-Vaani Settings</h3>
+        </div>
+        <button id="closeSettingsBtn" class="btn-close-modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="modalGnaniKey">Gnani.ai API Key (Vachana Platform):</label>
+          <input type="password" id="modalGnaniKey" placeholder="vach_..." autocomplete="off">
+          <small class="field-hint">Required for official Gnani Timbre v3.0 Indic TTS &amp; Prisma STT.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="modalPhoneChange">Active Farmer Mobile Number:</label>
+          <input type="tel" id="modalPhoneChange" placeholder="9876543210" maxlength="10">
+          <small class="field-hint">Used for conversational memory and direct WhatsApp dispatch.</small>
+        </div>
+
+        <div class="form-group">
+          <label>Database Status:</label>
+          <div class="db-status-pill">
+            <span class="pulse-dot-green"></span>
+            <span>Clean Database: Active (Supabase Cloud + Local SQLite)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="saveSettingsBtn" class="btn-primary-action">Save &amp; Reconnect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Web Audio Canvas for visualizer data processing -->
+  <canvas id="hiddenCanvas" width="100" height="50" style="display: none;"></canvas>
+
+  <script src="app.js?v=4"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+# Environment & Secrets
+.env
+*.env
+.env.local
+.env.*.local
+!.env.example
+!backend/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+baileys_auth_info/
+
+# Databases & local state
+*.db
+*.db-journal
+*.log
+*.wav
+*.mp3
+
+# Scratch & Extraction notes
+extracted_*.txt
+
+# OS
+.DS_Store
+Thumbs.db
+

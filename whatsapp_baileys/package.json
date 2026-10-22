@@ -1,0 +1,17 @@
+{
+  "name": "kisan-vaani-whatsapp-baileys",
+  "version": "1.0.0",
+  "description": "WhatsApp Baileys Service for Kisan-Vaani Farmer Intelligence Reports",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.19",
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "qrcode": "^1.5.4",
+    "pino": "^9.6.0"
+  }
+}

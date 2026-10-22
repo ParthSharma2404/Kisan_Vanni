@@ -1,0 +1,30 @@
+[
+  {
+    "category": "commission_fees",
+    "rule_title": "0% Farmer Commission (Zero Arhtiya Deduction)",
+    "official_mandate": "As per eNAM guidelines and APMC Model Act 2017, commission/market fee is payable SOLELY by the buyer/trader. No commission can be deducted from the farmer's gross proceeds.",
+    "spoken_summary_hi": "eNAM aur APMC niyam ke mutabik, aadhitiya ka koi bhi commission kisan ke paise se nahi kat sakta. Commission hamesha khareedne wala vyapari deta hai.",
+    "actionable_advice": "If an arhtiya deducts 2-6% commission, ask for the formal APMC receipt and report it to the Mandi Secretary office."
+  },
+  {
+    "category": "weighment",
+    "rule_title": "Electronic Weighment & Kanta Parchi",
+    "official_mandate": "All produce traded under eNAM must be weighed on electronic, calibrated weighbridges. Weighment charges (Hamali/Tolao) are regulated by the APMC (typically ₹10-₹15 per quintal).",
+    "spoken_summary_hi": "Maal ki tulai hamesha computerized kanta par hi karayein aur computer wali kanta parchi zaroor lein. Manmani katauti gair-kanooni hai.",
+    "actionable_advice": "Never accept visual estimation or manual uncalibrated beam scales."
+  },
+  {
+    "category": "quality_assaying",
+    "rule_title": "Free Scientific Assaying (Quality Testing)",
+    "official_mandate": "Every eNAM integrated mandi is equipped with a quality assaying laboratory. Farmers are entitled to have moisture, size, and foreign matter tested objectively before auction.",
+    "spoken_summary_hi": "Mandi me sarkari laboratory hoti hai jahan fasal ki quality aur nami (moisture) ki jaanch muft hoti hai. Isse vyapari aapki fasal ko bekar bata kar daam nahi gira sakta.",
+    "actionable_advice": "Get an assaying certificate before the bidding starts to lock in Fair Average Quality (FAQ) pricing."
+  },
+  {
+    "category": "payment_guarantee",
+    "rule_title": "Same-Day Direct Bank Settlement (DBT)",
+    "official_mandate": "Payments for eNAM bids are settled directly through the eNAM clearing house into the farmer's bank account on the same day or within 24 hours.",
+    "spoken_summary_hi": "eNAM par bikri ka paisa seedha aapke bank khate me aana chahiye, kisi kache parchi ya lambe udhar par maal na dein.",
+    "actionable_advice": "Keep your Aadhaar-linked bank account number handy for direct settlement."
+  }
+]
