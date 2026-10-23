@@ -34,7 +34,7 @@ class GnaniSTTService:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
                 res = await client.post(self.api_url, headers=headers, files=files, data=data)
                 if res.status_code == 200:
                     result = res.json()

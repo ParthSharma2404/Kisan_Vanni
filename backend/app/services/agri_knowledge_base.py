@@ -39,6 +39,19 @@ AGRI_KNOWLEDGE_DOCUMENTS: List[Dict[str, Any]] = [
         )
     },
     {
+        "id": "doc_tomato_fruit_rot",
+        "category": "disease_pest",
+        "crop": "tomato",
+        "topic": "Tomato Fruit Rot & Blight (टमाटर में फल सड़न और झुलसा रोग)",
+        "keywords": ["fruit rot", "blight", "tamatar rot", "dhabbe", "kale dhabbe", "fal sadan", "sadan", "black spots", "फल सड़न", "झुलसा", "काले धब्बे"],
+        "content": (
+            "टमाटर में फल सड़न और झुलसा रोग (Fruit Rot / Blight) फफूंद के कारण होता है जिससे फलों और पत्तियों पर काले, भूरे पानीदार धब्बे बनते हैं और फल सड़ने लगते हैं। "
+            "रोकथाम और उपचार: 1) मैंकोजेब (Mancozeb 75 WP) 2 ग्राम प्रति लीटर पानी में घोलकर छिड़काव करें। "
+            "2) अधिक संक्रमण होने पर रिडोमिल गोल्ड (Metalaxyl + Mancozeb) 2.5 ग्राम प्रति लीटर पानी में मिलाकर 12-15 दिन के अंतराल पर छिड़कें। "
+            "3) खेत में जलनिकासी की उचित व्यवस्था रखें और प्रभावित सड़े फलों को तोड़कर नष्ट कर दें।"
+        )
+    },
+    {
         "id": "doc_potato_early_late_blight",
         "category": "disease_pest",
         "crop": "potato",

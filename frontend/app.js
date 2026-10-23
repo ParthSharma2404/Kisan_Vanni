@@ -25,10 +25,10 @@ let silenceStartTime = 0;
 let speechStartTime = 0;
 let audioBufferChunks = [];
 let preRollBuffer = [];
-const MAX_PRE_ROLL = 5;
-let ambientNoiseFloor = 0.012;
-const SILENCE_TIMEOUT_MS = 750;
-const MIN_SPEECH_DURATION_MS = 250;
+const MAX_PRE_ROLL = 12;
+let ambientNoiseFloor = 0.008;
+const SILENCE_TIMEOUT_MS = 1800; // 1.8s silence window to accommodate natural pauses in Indian speech
+const MIN_SPEECH_DURATION_MS = 200;
 
 // DOM Elements
 const loginModalOverlay = document.getElementById("loginModalOverlay");
@@ -77,11 +77,104 @@ const MIC_LOCKED_SVG = `
 `;
 
 // =====================================================================
-// 1. 24-HOUR EPHEMERAL STORAGE & AUTHENTICATION
+// SOUND EFFECTS ENGINE (Zero-Latency Web Audio API Synthesizer)
 // =====================================================================
+const SoundFX = {
+  ctx: null,
+
+  init() {
+    try {
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) this.ctx = new AudioCtx();
+      }
+      if (this.ctx && this.ctx.state === "suspended") {
+        this.ctx.resume().catch(() => {});
+      }
+    } catch (e) {}
+  },
+
+  // Tactile, crisp modern pop on user message dispatch
+  playSend() {
+    try {
+      this.init();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(360, now);
+      osc.frequency.exponentialRampToValueAtTime(620, now + 0.08);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.12);
+    } catch (e) {
+      console.debug("[SoundFX] playSend error:", e);
+    }
+  },
+
+  // Gentle, soothing melodic chord on AI response arrival
+  playReceive() {
+    try {
+      this.init();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+
+      // Note 1: E5 (659.25 Hz)
+      const osc1 = this.ctx.createOscillator();
+      const gain1 = this.ctx.createGain();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(659.25, now);
+      gain1.gain.setValueAtTime(0.001, now);
+      gain1.gain.linearRampToValueAtTime(0.10, now + 0.02);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc1.connect(gain1);
+      gain1.connect(this.ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.23);
+
+      // Note 2: A5 (880.00 Hz) - staggered slightly (70ms) for warm harmonic lift
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(880.0, now + 0.07);
+      gain2.gain.setValueAtTime(0.001, now + 0.07);
+      gain2.gain.linearRampToValueAtTime(0.09, now + 0.09);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+      osc2.connect(gain2);
+      gain2.connect(this.ctx.destination);
+      osc2.start(now + 0.07);
+      osc2.stop(now + 0.33);
+    } catch (e) {
+      console.debug("[SoundFX] playReceive error:", e);
+    }
+  }
+};
+
+// =====================================================================
+// 1. 24-HOUR EPHEMERAL STORAGE & AUTHENTICATION
 function getTodayDateKey() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  // Explicitly locked to Indian Standard Time (IST / Asia/Kolkata / UTC+5:30)
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', { 
+      timeZone: 'Asia/Kolkata', 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    });
+    return formatter.format(new Date()); // Always returns "YYYY-MM-DD" matching 12:00 AM IST midnight
+  } catch (e) {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
 }
 
 function initSessionAndStorage() {
@@ -109,7 +202,7 @@ function initSessionAndStorage() {
   }
 }
 
-function saveTodayChatMessage(role, text, extra = {}) {
+function saveTodayChatMessage(role, text, extra = {}, audioBase64 = "") {
   const todayKey = getTodayDateKey();
   const storageKey = `kisan_chat_${activePhone}_${todayKey}`;
   let history = [];
@@ -118,7 +211,15 @@ function saveTodayChatMessage(role, text, extra = {}) {
     if (existing) history = JSON.parse(existing);
   } catch (e) { history = []; }
 
-  history.push({ role, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), extra });
+  // Prevent consecutive duplicate identical entries
+  if (history.length > 0) {
+    const last = history[history.length - 1];
+    if (last.role === role && (last.text || "").trim() === (text || "").trim()) {
+      return;
+    }
+  }
+
+  history.push({ role, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), extra, audio_base64: audioBase64 });
   try {
     localStorage.setItem(storageKey, JSON.stringify(history));
   } catch (e) {}
@@ -132,11 +233,27 @@ function loadTodayChatHistory() {
     if (existing) {
       const messages = JSON.parse(existing);
       if (dynamicMessagesContainer) dynamicMessagesContainer.innerHTML = "";
+      
+      // Deduplicate repeat initial greetings from earlier reloads
+      let hasGreeting = false;
+      const cleanMessages = [];
       for (const msg of messages) {
+        const isGreeting = msg.text && msg.text.includes("Namaste Kisan Bhai ji, boliye");
+        if (isGreeting) {
+          if (!hasGreeting) {
+            hasGreeting = true;
+            cleanMessages.push(msg);
+          }
+        } else {
+          cleanMessages.push(msg);
+        }
+      }
+
+      for (const msg of cleanMessages) {
         if (msg.role === "user") {
           renderUserMessage(msg.text, false);
         } else {
-          renderAiCard(msg.text, msg.extra || {}, false);
+          renderAiCard(msg.text, msg.extra || {}, false, msg.audio_base64 || "");
         }
       }
       scrollToBottom();
@@ -181,10 +298,10 @@ function setTurnState(state, message = "") {
     // Farmer is actively speaking
     isAiSpeaking = false;
     if (reasoningIndicator) reasoningIndicator.style.display = "none";
-    if (turnStatusText) turnStatusText.innerText = "सुन रहा हूँ... बोलिए";
+    if (turnStatusText) turnStatusText.innerText = message || "🎙️ सुन रहा हूँ... बोलिए (बोलना पूरा होने पर रुकें या बटन दबाएं)";
     if (mainMicBtn) {
       mainMicBtn.className = "dock-mic-btn recording";
-      mainMicBtn.setAttribute("title", "माइक सक्रिय है...");
+      mainMicBtn.setAttribute("title", "बोलना पूरा करने के लिए दबाएं या 2 सेकंड शांत रहें");
     }
     if (micIconHolder) micIconHolder.innerHTML = MIC_IDLE_SVG;
     if (activeStatusText) activeStatusText.innerText = "Listening...";
@@ -209,13 +326,26 @@ function setTurnState(state, message = "") {
 function scrollToBottom() {
   if (chatFeed) {
     setTimeout(() => {
-      chatFeed.scrollTop = chatFeed.scrollHeight;
+      chatFeed.scrollTo({
+        top: chatFeed.scrollHeight,
+        behavior: "smooth"
+      });
     }, 40);
   }
 }
 
 function renderUserMessage(text, save = true) {
   if (!dynamicMessagesContainer || !text) return;
+
+  // Deduplicate consecutive identical user messages in the DOM
+  const lastMsg = dynamicMessagesContainer.lastElementChild;
+  if (lastMsg && lastMsg.classList.contains("user-row")) {
+    const bubble = lastMsg.querySelector(".user-bubble");
+    if (bubble && bubble.innerText.trim() === text.trim()) {
+      return;
+    }
+  }
+
   const row = document.createElement("div");
   row.className = "chat-message-row user-row";
   row.innerHTML = `<div class="user-bubble">${escapeHtml(text)}</div>`;
@@ -225,7 +355,7 @@ function renderUserMessage(text, save = true) {
   if (save) saveTodayChatMessage("user", text);
 }
 
-function renderAiCard(text, extra = {}, save = true) {
+function renderAiCard(text, extra = {}, save = true, audioBase64 = "") {
   if (!dynamicMessagesContainer || !text) return;
   if (reasoningIndicator) reasoningIndicator.style.display = "none";
 
@@ -244,9 +374,9 @@ function renderAiCard(text, extra = {}, save = true) {
     </div>
     <div class="msg-card ai-card">
       <div class="card-header-badge">${escapeHtml(badge)}</div>
-      <div class="card-content">${formatMarkdownText(text)}</div>
+      <div class="card-content">${formatMarkdownText(text, extra)}</div>
       <div class="card-actions">
-        <button class="btn-card-audio" onclick="replayAiText(this)" data-text="${escapeHtml(text)}">
+        <button class="btn-card-audio" onclick="replayAiText(this)" data-text="${escapeHtml(text)}" data-audio="${audioBase64 || ''}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
           <span>दोबारा सुनें</span>
         </button>
@@ -256,14 +386,106 @@ function renderAiCard(text, extra = {}, save = true) {
   dynamicMessagesContainer.appendChild(row);
   scrollToBottom();
 
-  if (save) saveTodayChatMessage("assistant", text, extra);
+  if (save) saveTodayChatMessage("assistant", text, extra, audioBase64);
 }
 
-function formatMarkdownText(raw) {
-  let clean = escapeHtml(raw);
-  clean = clean.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  clean = clean.replace(/₹([\d,]+)/g, '<strong style="color:var(--neon-lime);">₹$1</strong>');
-  return `<p>${clean.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
+function formatMarkdownText(raw, extra = {}) {
+  if (!raw) return "";
+  let text = escapeHtml(raw);
+
+  // 1. Highlight currency amounts in neon lime
+  text = text.replace(/₹([\d,]+(?:\.\d+)?)/g, '<strong class="hl-currency">₹$1</strong>');
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  // 2. Highlight key units (quintal, kg, etc.)
+  text = text.replace(/\b(\d+(?:\.\d+)?)\s*(quintal|kilo|kg|क्विंटल|किलो|टन|ton|bori|बोरी)\b/gi, '<span class="hl-metric">$1 $2</span>');
+
+  // 3. Extract eNAM Statutory Advisory (0% Commission Guarantee)
+  let enamBanner = "";
+  const enamRegex = /(?:Aur\s+)?eNAM\s+kanoon[^\n.!।?]+(?:commission\s+nahi\s+kaat\s+sakta|zero\s+percent[^\n.!।?]*)[.!।]?/i;
+  const enamMatch = text.match(enamRegex);
+  if (enamMatch) {
+    text = text.replace(enamMatch[0], "").trim();
+    enamBanner = `
+      <div class="card-enam-banner">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span><strong>eNAM अधिकार:</strong> 0% कमीशन कानूनी संरक्षण — आढ़तिया कमीशन नहीं काट सकता।</span>
+      </div>
+    `;
+  }
+
+  // 4. Extract Arbitrage Gain / Direct Profit Highlight
+  let profitPill = "";
+  const profitRegex = /([^\n.!।?]*?(?:seedha\s+munafa\s+zyada\s+hoga|munafa\s+zyada\s+hoga|seedha\s+fayda)[^\n.!।?]*[.!।]?)/i;
+  const profitMatch = text.match(profitRegex);
+  if (profitMatch) {
+    profitPill = `
+      <div class="card-profit-callout">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+        <span>${profitMatch[0].trim()}</span>
+      </div>
+    `;
+    text = text.replace(profitMatch[0], "").trim();
+  }
+
+  // 5. Extract Follow-up Questions at the end
+  let questionBox = "";
+  const questionMatches = text.match(/([^\n.!।?]+?\?)\s*$/i);
+  if (questionMatches && questionMatches[0]) {
+    const qText = questionMatches[0].trim();
+    text = text.slice(0, text.length - questionMatches[0].length).trim();
+    questionBox = `
+      <div class="card-question-callout">
+        <div class="question-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="question-text">${qText}</div>
+      </div>
+    `;
+  }
+
+  // 6. Numbered treatments (1) ... 2) ...)
+  let rxStepsHtml = "";
+  if (/1\)|1\./.test(text) && /2\)|2\./.test(text)) {
+    const stepMatches = text.match(/(?:(?:^|\s)(?:[1-4]\)|[1-4]\.)\s*[\s\S]*?)(?=(?:[1-4]\)|[1-4]\.)|$)/g);
+    if (stepMatches && stepMatches.length > 1) {
+      rxStepsHtml = stepMatches.map((st, idx) => {
+        const cleanContent = st.replace(/^(?:\s*[1-4]\)|[1-4]\.)\s*/, '').trim();
+        return `
+          <div class="rx-step">
+            <span class="rx-badge">${idx + 1}</span>
+            <span class="rx-content">${cleanContent}</span>
+          </div>
+        `;
+      }).join("");
+      text = text.replace(/(?:(?:^|\s)(?:[1-4]\)|[1-4]\.)\s*[\s\S]*?)(?=(?:[1-4]\)|[1-4]\.)|$)/g, "").trim();
+    }
+  }
+
+  // 7. Bullet points: lines starting with •, -, *
+  let bulletHtml = "";
+  const rawLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const remainingParas = [];
+
+  for (const line of rawLines) {
+    if (/^[•\-\*]\s+/.test(line)) {
+      const bContent = line.replace(/^[•\-\*]\s+/, '').trim();
+      bulletHtml += `
+        <div class="card-bullet-row">
+          <div class="bullet-dot"></div>
+          <div class="bullet-content">${bContent}</div>
+        </div>
+      `;
+    } else {
+      // Split sentences cleanly (by danda ।, period preceded by word or parenthesis, or exclamation mark)
+      const sentences = line.split(/(?<=[।!])\s+|(?<=[a-zA-Z\u0900-\u097F\)])\.\s+/).filter(s => s.trim().length > 0);
+      for (const s of sentences) {
+        remainingParas.push(`<p class="card-p">${s.trim()}</p>`);
+      }
+    }
+  }
+
+  return `${remainingParas.join("")}${profitPill}${bulletHtml}${rxStepsHtml}${enamBanner}${questionBox}`;
 }
 
 function escapeHtml(str) {
@@ -271,16 +493,18 @@ function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// Replay Audio on button click
+// Replay Audio: Always uses official Gnani Timbre neural voice (Zero robotic voices)
 window.replayAiText = function(btn) {
   const text = btn.getAttribute("data-text");
+  const cachedAudio = btn.getAttribute("data-audio");
   if (text) {
-    speakWithBrowserTTS(text);
+    playGnaniAudio(text, cachedAudio, btn);
   }
 };
 
-window.playWelcomeAudio = function() {
-  speakWithBrowserTTS("राम राम किसान भाई! मैं किसान-वाणी हूँ। आप बोलकर या लिखकर किसी भी फसल का ताज़ा मंडी भाव, बीमारी की दवाई, या सरकारी योजनाओं के बारे में पूछ सकते हैं।");
+window.playWelcomeAudio = function(btn) {
+  const welcomeText = "राम राम किसान भाई! मैं किसान-वाणी हूँ। आप बोलकर या लिखकर किसी भी फसल का ताज़ा मंडी भाव, बीमारी की दवाई, या सरकारी योजनाओं के बारे में पूछ सकते हैं।";
+  playGnaniAudio(welcomeText, null, btn);
 };
 
 // =====================================================================
@@ -344,92 +568,129 @@ function handleServerEvent(data) {
   else if (type === "transcript") {
     if (data.role === "user") {
       renderUserMessage(data.text);
+      SoundFX.playSend();
     }
   } 
   else if (type === "agent_audio") {
     const text = data.text || "";
-    renderAiCard(text, data.data || {});
+    // Avoid duplicate greetings on reconnect
+    if (text.includes("Namaste Kisan Bhai ji, boliye") && dynamicMessagesContainer && dynamicMessagesContainer.children.length > 0) {
+      return;
+    }
+
+    SoundFX.playReceive();
+    renderAiCard(text, data.data || {}, true, data.audio_base64 || "");
 
     // Check if daily summary was requested & delivered
     if (data.step === "DAILY_SUMMARY_DELIVERED" && data.data) {
       showDailySummaryModal(data.data.whatsapp_text, data.data.whatsapp_url);
     }
 
-    // Play TTS: Lock Mic while AI speaks
-    setTurnState("speaking");
-    if (data.audio_base64) {
-      playAgentAudio(data.audio_base64, text);
-    } else {
-      speakWithBrowserTTS(text);
-    }
+    // Play TTS via unified Gnani Timbre v3.0 voice (Shivani)
+    playGnaniAudio(text, data.audio_base64);
   }
 }
 
 // =====================================================================
-// 5. DUAL AUDIO PLAYBACK & SPEECH SYNTHESIS
+// 5. UNIFIED GNANI TIMBRE NEURAL AUDIO ENGINE (Zero Robotic Voices)
 // =====================================================================
-function playAgentAudio(base64Wav, fallbackText = "") {
-  stopAnyCurrentAudio();
+const gnaniAudioCache = new Map();
 
+async function playGnaniAudio(text, base64Wav = null, activeBtn = null) {
+  stopAnyCurrentAudio();
+  setTurnState("speaking");
+
+  if (activeBtn) {
+    activeBtn.classList.add("playing");
+    activeBtn.innerHTML = `
+      <div class="audio-wave-bars"><span></span><span></span><span></span><span></span></div>
+      <span>सुन रहे हैं...</span>
+    `;
+  }
+
+  // 1. If base64Wav audio is already provided, cache and play it immediately
+  if (base64Wav && base64Wav.length > 50) {
+    gnaniAudioCache.set(text, base64Wav);
+    executePlayGnaniWav(base64Wav, activeBtn);
+    return;
+  }
+
+  // 2. Check in-memory audio cache
+  if (gnaniAudioCache.has(text)) {
+    executePlayGnaniWav(gnaniAudioCache.get(text), activeBtn);
+    return;
+  }
+
+  // 3. Synthesize via official Gnani Timbre v3.0 API (Shivani voice)
+  try {
+    const res = await fetch(`${API_BASE}/api/tts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: text,
+        language: "hi-IN",
+        voice: "Shivani"
+      })
+    });
+
+    if (res.ok) {
+      const blob = await res.blob();
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const rawBase64 = reader.result.split(",")[1];
+        if (rawBase64 && rawBase64.length > 50) {
+          gnaniAudioCache.set(text, rawBase64);
+          if (activeBtn) activeBtn.setAttribute("data-audio", rawBase64);
+          executePlayGnaniWav(rawBase64, activeBtn);
+        } else {
+          finishAudioPlayback(activeBtn);
+        }
+      };
+      reader.readAsDataURL(blob);
+    } else {
+      finishAudioPlayback(activeBtn);
+    }
+  } catch (err) {
+    console.warn("[GnaniTTS] Fetch error:", err);
+    finishAudioPlayback(activeBtn);
+  }
+}
+
+function executePlayGnaniWav(base64Wav, activeBtn) {
   try {
     currentAudio = new Audio("data:audio/wav;base64," + base64Wav);
     currentAudio.volume = 1.0;
 
     currentAudio.onended = () => {
-      currentAudio = null;
-      setTurnState("ready"); // AI finished speaking -> UNLOCK MIC!
+      finishAudioPlayback(activeBtn);
     };
 
     currentAudio.onerror = () => {
-      currentAudio = null;
-      if (fallbackText) speakWithBrowserTTS(fallbackText);
-      else setTurnState("ready");
+      finishAudioPlayback(activeBtn);
     };
 
     const p = currentAudio.play();
     if (p !== undefined) {
       p.catch(() => {
-        if (fallbackText) speakWithBrowserTTS(fallbackText);
-        else setTurnState("ready");
+        finishAudioPlayback(activeBtn);
       });
     }
   } catch (err) {
-    if (fallbackText) speakWithBrowserTTS(fallbackText);
-    else setTurnState("ready");
+    finishAudioPlayback(activeBtn);
   }
 }
 
-function speakWithBrowserTTS(text) {
-  if (!text || !window.speechSynthesis) {
-    setTurnState("ready");
-    return;
+function finishAudioPlayback(activeBtn) {
+  currentAudio = null;
+  if (activeBtn) {
+    activeBtn.classList.remove("playing");
+    const isWelcome = activeBtn.getAttribute("onclick") && activeBtn.getAttribute("onclick").includes("playWelcomeAudio");
+    activeBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+      <span>${isWelcome ? "सुनें" : "दोबारा सुनें"}</span>
+    `;
   }
-
-  stopAnyCurrentAudio();
-
-  try {
-    window.speechSynthesis.resume();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "hi-IN";
-    utterance.rate = 1.0;
-
-    const voices = window.speechSynthesis.getVoices();
-    const hiVoice = voices.find(v => v.lang && (v.lang.includes("hi") || v.lang.includes("HI")));
-    if (hiVoice) utterance.voice = hiVoice;
-
-    setTurnState("speaking");
-
-    utterance.onend = () => {
-      setTurnState("ready"); // AI finished speaking -> UNLOCK MIC!
-    };
-    utterance.onerror = () => {
-      setTurnState("ready");
-    };
-
-    window.speechSynthesis.speak(utterance);
-  } catch (e) {
-    setTurnState("ready");
-  }
+  setTurnState("ready");
 }
 
 function stopAnyCurrentAudio() {
@@ -506,7 +767,8 @@ async function startMicrophoneRecording() {
         sum += inputData[i] * inputData[i];
       }
       const rms = Math.sqrt(sum / inputData.length);
-      const dynamicThreshold = Math.max(0.016, ambientNoiseFloor * 2.2);
+      // Gentle dynamic threshold that reliably picks up natural and soft Indic speech
+      const dynamicThreshold = Math.max(0.006, ambientNoiseFloor * 1.6);
 
       const now = performance.now();
 
@@ -531,8 +793,9 @@ async function startMicrophoneRecording() {
         if (!isSpeaking) {
           preRollBuffer.push(new Float32Array(inputData));
           if (preRollBuffer.length > MAX_PRE_ROLL) preRollBuffer.shift();
-          ambientNoiseFloor = ambientNoiseFloor * 0.95 + rms * 0.05;
+          ambientNoiseFloor = Math.min(0.02, ambientNoiseFloor * 0.95 + rms * 0.05);
         } else {
+          // While speaking, retain pauses so word gaps aren't lost
           audioBufferChunks.push(new Float32Array(inputData));
           if (silenceStartTime === 0) silenceStartTime = now;
           else if (now - silenceStartTime > SILENCE_TIMEOUT_MS) {
@@ -565,17 +828,17 @@ function stopRecordingAndSend() {
     return;
   }
 
-  // Calculate length and encode WAV
-  let totalLength = 0;
-  for (let c of audioBufferChunks) totalLength += c.length;
-  if (totalLength < 4000) { // Too short / accidental tap
+  const currentSampleRate = (audioContext && audioContext.sampleRate) ? audioContext.sampleRate : 16000;
+  const resampled16k = resampleTo16k(audioBufferChunks, currentSampleRate);
+
+  if (resampled16k.length < 4000) { // Too short / accidental tap (<0.25s)
     setTurnState("ready");
     return;
   }
 
   setTurnState("reasoning", "प्रश्नोत्तर संसाधित हो रहा है...");
 
-  const wavBlob = encodeWAV(audioBufferChunks, 16000);
+  const wavBlob = encodeResampled16kWAV(resampled16k);
   const reader = new FileReader();
   reader.onloadend = () => {
     const base64Wav = reader.result.split(',')[1];
@@ -590,10 +853,39 @@ function stopRecordingAndSend() {
   audioBufferChunks = [];
 }
 
-function encodeWAV(chunks, sampleRate) {
+// Resamples any input sample rate (e.g. 48000 or 44100 from browser AudioContext) to pristine 16000 Hz mono
+function resampleTo16k(chunks, sourceRate) {
   let totalLength = 0;
   for (let c of chunks) totalLength += c.length;
-  const buffer = new ArrayBuffer(44 + totalLength * 2);
+  const merged = new Float32Array(totalLength);
+  let offset = 0;
+  for (let c of chunks) {
+    merged.set(c, offset);
+    offset += c.length;
+  }
+
+  if (!sourceRate || sourceRate === 16000) {
+    return merged;
+  }
+
+  const ratio = sourceRate / 16000;
+  const targetLength = Math.round(totalLength / ratio);
+  const result = new Float32Array(targetLength);
+
+  for (let i = 0; i < targetLength; i++) {
+    const srcPos = i * ratio;
+    const srcIndex = Math.floor(srcPos);
+    const fraction = srcPos - srcIndex;
+    const s0 = merged[srcIndex] || 0;
+    const s1 = (srcIndex + 1 < merged.length) ? merged[srcIndex + 1] : s0;
+    result[i] = s0 + fraction * (s1 - s0);
+  }
+  return result;
+}
+
+function encodeResampled16kWAV(samples) {
+  const sampleRate = 16000;
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
   const view = new DataView(buffer);
 
   function writeString(offset, string) {
@@ -603,26 +895,24 @@ function encodeWAV(chunks, sampleRate) {
   }
 
   writeString(0, 'RIFF');
-  view.setUint32(4, 36 + totalLength * 2, true);
+  view.setUint32(4, 36 + samples.length * 2, true);
   writeString(8, 'WAVE');
   writeString(12, 'fmt ');
   view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
+  view.setUint16(20, 1, true); // PCM Format (1)
+  view.setUint16(22, 1, true); // Mono channel
+  view.setUint32(24, sampleRate, true); // 16000 Hz
+  view.setUint32(28, sampleRate * 2, true); // Byte rate (16000 * 2)
+  view.setUint16(32, 2, true); // Block align (1 * 16 / 8)
+  view.setUint16(34, 16, true); // 16 bits per sample
   writeString(36, 'data');
-  view.setUint32(40, totalLength * 2, true);
+  view.setUint32(40, samples.length * 2, true);
 
   let offset = 44;
-  for (let c of chunks) {
-    for (let i = 0; i < c.length; i++) {
-      let s = Math.max(-1, Math.min(1, c[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-      offset += 2;
-    }
+  for (let i = 0; i < samples.length; i++) {
+    let s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    offset += 2;
   }
   return new Blob([view], { type: 'audio/wav' });
 }
@@ -630,14 +920,18 @@ function encodeWAV(chunks, sampleRate) {
 // =====================================================================
 // 7. USER TEXT SUBMISSION
 // =====================================================================
+let isSubmittingText = false;
+
 function submitUserText() {
   const text = chatTextInput.value.trim();
-  if (!text) return;
+  if (!text || isSubmittingText) return;
 
+  isSubmittingText = true;
   chatTextInput.value = "";
   chatTextInput.blur();
 
   renderUserMessage(text);
+  SoundFX.playSend();
   setTurnState("reasoning", "उत्तर तैयार हो रहा है...");
 
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -646,6 +940,10 @@ function submitUserText() {
       text: text
     }));
   }
+
+  setTimeout(() => {
+    isSubmittingText = false;
+  }, 400);
 }
 
 // =====================================================================
@@ -736,10 +1034,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Close WhatsApp summary modal
-  if (waCloseBtn) {
-    waCloseBtn.addEventListener("click", () => {
-      if (waSummaryModal) waSummaryModal.style.display = "none";
-    });
-  }
+  // Unlock Web Audio API context on first user interaction
+  const unlockAudio = () => {
+    SoundFX.init();
+    window.removeEventListener("click", unlockAudio);
+    window.removeEventListener("keydown", unlockAudio);
+    window.removeEventListener("touchstart", unlockAudio);
+  };
+  window.addEventListener("click", unlockAudio, { passive: true });
+  window.addEventListener("keydown", unlockAudio, { passive: true });
+  window.addEventListener("touchstart", unlockAudio, { passive: true });
 });

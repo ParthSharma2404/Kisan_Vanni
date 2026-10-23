@@ -45,7 +45,49 @@ class DialogueManager:
 
     def get_or_create_session(self, session_id: str) -> SessionState:
         if session_id not in self.sessions:
-            self.sessions[session_id] = SessionState(session_id)
+            session = SessionState(session_id)
+            # Preload profile from farmer_db if phone number exists in session_id
+            m = re.search(r"call_(\d{10})_", session_id)
+            if m:
+                phone = m.group(1)
+                session.phone_number = phone
+                try:
+                    f_rec = farmer_db.get_farmer(phone)
+                    if f_rec:
+                        if f_rec.get("name") and f_rec["name"] != "Kisan Bhai":
+                            session.farmer_name = f_rec["name"]
+                        loc = f_rec.get("village") or f_rec.get("district")
+                        if loc:
+                            session.location_name = loc
+                            session.district = loc
+                            d_lower = loc.lower()
+                            if any(w in d_lower for w in ["punjab", "hardaspur", "gurdaspur", "ludhiana", "khanna"]):
+                                session.state = "punjab"
+                                session.lat = 30.9010
+                                session.lon = 75.8573
+                            elif any(w in d_lower for w in ["haryana", "karnal", "hisar", "sirsa"]):
+                                session.state = "haryana"
+                                session.lat = 29.6857
+                                session.lon = 76.9905
+                            elif any(w in d_lower for w in ["rajasthan", "jaipur", "alwar", "kota"]):
+                                session.state = "rajasthan"
+                                session.lat = 26.9124
+                                session.lon = 75.7873
+                            elif any(w in d_lower for w in ["up", "uttar", "agra", "kanpur"]):
+                                session.state = "up"
+                                session.lat = 27.1767
+                                session.lon = 78.0081
+                            elif any(w in d_lower for w in ["mp", "madhya", "indore", "ujjain"]):
+                                session.state = "mp"
+                                session.lat = 22.7196
+                                session.lon = 75.8577
+                            elif any(w in d_lower for w in ["maharashtra", "nashik", "lasalgaon"]):
+                                session.state = "maharashtra"
+                                session.lat = 20.0800
+                                session.lon = 74.1100
+                except Exception as e:
+                    print(f"[DialogueManager] Profile preload warning: {e}")
+            self.sessions[session_id] = session
         return self.sessions[session_id]
 
     def reset_session(self, session_id: str):
@@ -98,7 +140,7 @@ class DialogueManager:
 
         # 3. Agentic Agricultural Router (Guardrails + Dynamic Tool Routing + Rolling Memory)
         from app.services.agri_router import agri_router
-        res = agri_router.route_and_execute(utterance, session)
+        res = await agri_router.route_and_execute(utterance, session)
         if res and res.get("spoken_text"):
             session.add_history("assistant", res["spoken_text"])
         return res
@@ -355,7 +397,11 @@ class DialogueManager:
         discussed today, and creates a consolidated official eNAM-certified WhatsApp receipt.
         """
         import datetime, random
-        today_str = datetime.date.today().strftime("%d %b %Y")
+        try:
+            from zoneinfo import ZoneInfo
+            today_str = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y")
+        except Exception:
+            today_str = datetime.date.today().strftime("%d %b %Y")
         dispatch_id = f"KV-{random.randint(1000, 9999)}"
         farmer_name = session.farmer_name or "Kisan Bhai"
         loc = session.location_name or session.district or "India"

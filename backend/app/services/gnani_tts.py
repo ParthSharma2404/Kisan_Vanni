@@ -45,7 +45,7 @@ class GnaniTTSService:
             }
 
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
                     res = await client.post(self.api_url, headers=headers, json=payload)
                     if res.status_code == 200 and len(res.content) > 100:
                         print(f"[GnaniTTS] Successfully synthesized {len(res.content)} bytes from Timbre v3.0")

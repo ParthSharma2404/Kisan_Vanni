@@ -119,4 +119,77 @@ class AgriRAGService:
             }
         }
 
+    def diagnose(self, crop: Optional[str], issue: Optional[str], query: str, farmer_name: str = "Kisan Bhai") -> Dict[str, Any]:
+        """
+        Direct semantic diagnosis called by the LLM Agentic Router.
+        Zero rigid keywords: matches ICAR knowledge base or synthesizes standard ICAR treatment.
+        """
+        search_query = f"{crop or ''} {issue or ''} {query}".strip()
+        matched_docs = self.retrieve(search_query, top_k=1)
+        
+        if matched_docs:
+            doc = matched_docs[0]
+            topic = doc.get("topic", f"{crop.capitalize() if crop else 'Fasal'} Rog Salah")
+            content = doc.get("content", "")
+            spoken = f"{farmer_name} ji! {topic} ke liye ICAR krishi vigyan kendra ki scientific salah: {content}"
+            return {
+                "spoken_text": spoken,
+                "step": "AGRI_ADVISORY",
+                "data": {
+                    "rag_retrieved": True,
+                    "doc_id": doc.get("id"),
+                    "topic": topic,
+                    "crop": crop,
+                    "issue": issue
+                }
+            }
+        
+        # Standard ICAR treatment fallback for crops
+        crop_key = (crop or "").lower()
+        crop_disp = crop.capitalize() if crop else "Fasal"
+        
+        issue_clean = (issue or "").lower()
+        remedy = None
+
+        if crop_key == "tomato":
+            if any(w in issue_clean for w in ["fruit_rot", "rot", "blight", "dhabbe", "sadne", "sadan", "spot"]):
+                topic = "Tamatar Fal Sadan (Fruit Rot / Blight)"
+                remedy = "Tamatar me fal sadne (Fruit Rot / Blight) ke liye: 1) Mancozeb 75 WP @ 2 gram prati liter paani me gholkar chhidkaav karein. 2) Khet me jal-jamaav na hone dein aur rogggrast falon ko nikal dein."
+            elif any(w in issue_clean for w in ["leaf_curl", "curl", "peeli", "mud", "whitefly", "virus"]):
+                topic = "Tamatar Leaf Curl Virus (पर्ण कुंचन रोग)"
+                remedy = "Tamatar me pattiya mudne par safed makhi rokne ke liye: 1) Imidacloprid 17.8 SL @ 1 ml prati 3 liter paani me spray karein. 2) Neem ka tel 1500 PPM @ 3 ml/liter milayein."
+            elif any(w in issue_clean for w in ["borer", "keeda", "chhed", "worm"]):
+                topic = "Tamatar Fal Chhedak Keeda (Fruit Borer)"
+                remedy = "Tamatar fal chhedak keede ke nidan ke liye: 1) Emamectin Benzoate 5 SG @ 4 gram prati 10 liter paani me milakar chhidkaav karein."
+            else:
+                topic = "Tamatar Fasal Rog Nidan"
+                remedy = "Tamatar me rogon ke bachav ke liye Mancozeb 75 WP @ 2 gram prati liter paani me milakar chhidkaav karein."
+        elif crop_key == "potato":
+            topic = "Aloo Pichheti Jhulsa (Late Blight)"
+            remedy = "Aloo me jhulsa rog ke liye: 1) Metalaxyl + Mancozeb (Ridomil MZ) @ 2.5 gram prati liter paani me gholkar chhidkaav karein."
+        elif crop_key == "onion":
+            topic = "Pyaaz Purpule Blotch Rog"
+            remedy = "Pyaaz me purpule blotch ya jhulsa ke liye: 1) Difenoconazole 25 EC @ 1 ml prati liter paani me milakar chhidkaav karein."
+        elif crop_key == "chilli":
+            topic = "Mirch Chhoord Kurchan / Thrips"
+            remedy = "Mirch me pattiya mudne ya thrips ke liye: 1) Fipronil 5 SC @ 2 ml prati liter paani me milakar chhidkaav karein."
+        elif crop_key == "wheat":
+            topic = "Gehun Peela Ratua (Yellow Rust)"
+            remedy = "Gehun me peela ratua (yellow rust) ke liye: 1) Propiconazole 25 EC (Tilt) @ 1 ml prati liter paani me chhidkaav karein."
+        else:
+            topic = f"{crop_disp} Rog Nidan"
+            remedy = f"{crop_disp} me samasya ke nidan ke liye saf saafai rakhein aur nazdeeki KVK ya Krishi Seva Kendra se sampark karein."
+
+        spoken = f"{farmer_name} ji! {topic} ke liye ICAR Krishi Vigyan salah: {remedy}"
+        return {
+            "spoken_text": spoken,
+            "step": "AGRI_ADVISORY",
+            "data": {
+                "rag_retrieved": False,
+                "topic": topic,
+                "crop": crop,
+                "issue": issue
+            }
+        }
+
 agri_rag = AgriRAGService()

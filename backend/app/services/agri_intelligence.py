@@ -20,7 +20,9 @@ from app.services.agri_rag import agri_rag
 # Comprehensive Indian State & Major Agricultural District Geolocation Mapping
 STATE_DISTRICT_MAP = {
     # Punjab
-    "punjab": ("punjab", "Punjab"), "पंजाब": ("punjab", "Punjab"),
+    "punjab": ("punjab", "Punjab"), "पंजाब": ("punjab", "Punjab"), "pujab": ("punjab", "Punjab"), "pubjab": ("punjab", "Punjab"),
+    "hardaspur": ("punjab", "Hardaspur, Punjab"), "हार्दसपुर": ("punjab", "Hardaspur, Punjab"),
+    "gurdaspur": ("punjab", "Gurdaspur, Punjab"), "गुरदासपुर": ("punjab", "Gurdaspur, Punjab"),
     "ludhiana": ("punjab", "Ludhiana"), "लुधियाना": ("punjab", "Ludhiana"),
     "jalandhar": ("punjab", "Jalandhar"), "जालंधर": ("punjab", "Jalandhar"),
     "amritsar": ("punjab", "Amritsar"), "अमृतसर": ("punjab", "Amritsar"),
@@ -292,6 +294,37 @@ COMMODITY_DATABASE = {
             "bihar": {"mandis": "Gulabbagh (Purnia) aur Begusarai", "price": 2300, "range": "₹2,050 se ₹2,480", "note": "Gulabbagh Asia ki sabse badi makka mandi me round-the-clock trading hai."},
             "mp": {"mandis": "Chhindwara aur Betul", "price": 2240, "range": "₹1,980 se ₹2,420", "note": "Corn starch aur feed factories bulk khareed rahi hain."},
             "karnataka": {"mandis": "Davangere aur Ranebennur", "price": 2280, "range": "₹2,020 se ₹2,460", "note": "Poultry hubs ki steady demand hai."}
+        }
+    },
+    "bajra": {
+        "names": ["bajra", "bajri", "pearl millet", "बाजरा", "बाजरी", "सज्जे"],
+        "hindi": "Bajra",
+        "benchmark_price": 2350,
+        "min_price": 2150,
+        "max_price": 2625,
+        "top_mandis": ["Khanna (Punjab)", "Jaipur (Rajasthan)", "Alwar (Rajasthan)", "Rewari (Haryana)"],
+        "advisory": "Government MSP ₹2,625 hai. Poultry feed aur local flour mills me clean dry bajra par achhi maang hai.",
+        "regional_mandis": {
+            "punjab": {"mandis": "Khanna, Ludhiana aur Bathinda", "price": 2400, "range": "₹2,200 se ₹2,625", "note": "Punjab mandiyon me feed millers aur traders ki active buying hai."},
+            "haryana": {"mandis": "Rewari, Bhiwani aur Hisar", "price": 2380, "range": "₹2,150 se ₹2,600", "note": "Haryana me bajra procurement MSP ke aas-paas active hai."},
+            "rajasthan": {"mandis": "Jaipur (Muhana), Alwar aur Dausa", "price": 2350, "range": "₹2,100 se ₹2,550", "note": "Desh ki sabse badi bajra belt me continuous arrival hai."},
+            "up": {"mandis": "Agra, Aligarh aur Mathura", "price": 2320, "range": "₹2,050 se ₹2,500", "note": "Local flour mills me steady demand hai."},
+            "gujarat": {"mandis": "Deesa aur Palanpur", "price": 2300, "range": "₹2,000 se ₹2,480", "note": "Banaskantha belt me trading normal hai."},
+            "maharashtra": {"mandis": "Dhule, Malegaon aur Ahmednagar", "price": 2350, "range": "₹2,100 se ₹2,550", "note": "Khandesh belt me bajra steady hai."}
+        }
+    },
+    "chilli": {
+        "names": ["chilli", "mirch", "mirchi", "green chilli", "red chilli", "मिर्च", "हरी मिर्च", "लाल मिर्च"],
+        "hindi": "Mirch",
+        "benchmark_price": 4200,
+        "min_price": 3200,
+        "max_price": 5800,
+        "top_mandis": ["Guntur (AP)", "Nagpur (MH)", "Jaipur (Rajasthan)", "Khammam (Telangana)"],
+        "advisory": "Taaza teekhi hari mirch par achha uthaan hai.",
+        "regional_mandis": {
+            "punjab": {"mandis": "Ludhiana aur Jalandhar", "price": 4100, "range": "₹3,200 se ₹5,200", "note": "Green chilli wholesale retail demand strong hai."},
+            "rajasthan": {"mandis": "Jaipur aur Jodhpur", "price": 4300, "range": "₹3,400 se ₹5,500", "note": "Mathania aur local teekhi mirch par tagda rate hai."},
+            "maharashtra": {"mandis": "Nagpur aur Nashik", "price": 4200, "range": "₹3,200 se ₹5,400", "note": "Wholesale arrivals smooth chal rahi hain."}
         }
     }
 }
@@ -1066,17 +1099,9 @@ class AgriIntelligenceEngine:
                 "data": {"feature": "WhatsApp Advisory"}
             }
 
-        # Greetings in Hindi / Hinglish / English
+        # Greetings in Hindi / Hinglish / English - return None so agri_router dynamic LLM generates lively contextual reply
         if any(w in text for w in ["namaste", "pranam", "ram ram", "kisan vaani", "hello", "hi", "नमस्ते", "प्रणाम", "राम राम", "जय जवान", "जय किसान", "हेलो"]):
-            return {
-                "spoken_text": (
-                    f"Namaste {session.farmer_name} ji! Main Kisan-Vaani hoon—Gnani AI dwara chalit aapka personal kheti advisor. "
-                    f"Aap mujhse kisi bhi fasal ka taaza mandi rate, bimari ki dawai, khad-sinchai ya sarkari yojanaon ke bare me pooch sakte hain. "
-                    f"Batayein aaj kaunsi fasal ya suvidha par baat karein?"
-                ),
-                "step": "OPEN_CONVERSATION",
-                "data": {}
-            }
+            return None
 
         # Gratitude
         if any(w in text for w in ["dhanyawad", "shukriya", "thanks", "theek hai", "achha", "धन्यवाद", "शुक्रिया", "ठीक है", "अच्छा"]):

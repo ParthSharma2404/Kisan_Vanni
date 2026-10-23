@@ -92,11 +92,12 @@ class VoiceGatewaySession:
             "farmer_profile": farmer,
             "gnani_configured": bool(settings.GNANI_API_KEY),
             "vad_mode": "full_duplex_barge_in",
-            "silence_threshold_ms": 700
+            "silence_threshold_ms": 1800
         })
 
-        # Synthesize and deliver the conversational greeting
-        await self._synthesize_and_deliver(greeting_text, step=dm_session.step, extra_data={"is_new": greeting_res["is_new"], "farmer": farmer})
+        # Synthesize and deliver conversational greeting ONLY if session is fresh (no prior messages)
+        if len(dm_session.chat_history) == 0:
+            await self._synthesize_and_deliver(greeting_text, step=dm_session.step, extra_data={"is_new": greeting_res["is_new"], "farmer": farmer})
 
     async def handle_speech_start(self):
         """
@@ -169,7 +170,7 @@ class VoiceGatewaySession:
                 return
 
         print(f"[VoiceGateway:{self.session_id}] Farmer Utterance (Prisma STT): '{transcript}'")
-        await self._process_text_utterance(transcript, turn_id)
+        await self._process_text_utterance(transcript, turn_id, is_stt=True)
 
     async def handle_user_text(self, data: Dict[str, Any]):
         """Direct text or prompt chip submission over WebSocket."""
@@ -178,16 +179,17 @@ class VoiceGatewaySession:
             return
         self.active_turn_id += 1
         turn_id = self.active_turn_id
-        await self._process_text_utterance(text, turn_id)
+        await self._process_text_utterance(text, turn_id, is_stt=False)
 
-    async def _process_text_utterance(self, text: str, turn_id: int):
-        # 1. Send user transcript to UI
-        await self.send_json({
-            "type": "transcript",
-            "role": "user",
-            "text": text,
-            "turn_id": turn_id
-        })
+    async def _process_text_utterance(self, text: str, turn_id: int, is_stt: bool = False):
+        # 1. Send user transcript to UI only if from voice STT (typed text is rendered optimistically by client)
+        if is_stt:
+            await self.send_json({
+                "type": "transcript",
+                "role": "user",
+                "text": text,
+                "turn_id": turn_id
+            })
 
         await self.send_json({
             "type": "vad_state",
