@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from app.config import settings
 from app.services.dialogue_manager import dialogue_manager
@@ -64,12 +64,32 @@ class KeyConfigRequest(BaseModel):
 async def root():
     return RedirectResponse(url="/app/")
 
+async def periodic_daily_mandi_sync():
+    """
+    Automated background worker:
+    1. Pre-fetches today's live Agmarknet mandi rates for staple crops.
+    2. Automatically repeats every 6 hours so the cache stays fresh with daily market arrivals.
+    """
+    staple_crops = ["Onion", "Tomato", "Wheat", "Potato", "Soyabean", "Bengal Gram(Gram)(Whole)"]
+    while True:
+        try:
+            print("[PeriodicSync] Running scheduled background sync for live Agmarknet mandi rates...")
+            for crop in staple_crops:
+                await mandi_service.fetch_rates_from_gov_api(commodity=crop, limit=35)
+                await asyncio.sleep(2.0)  # Gentle pacing to respect data.gov.in rate limits
+            print("[PeriodicSync] Scheduled Agmarknet sync completed successfully.")
+        except Exception as e:
+            print(f"[PeriodicSync] Background sync notice: {e}")
+        
+        # Refresh every 6 hours (matches morning and evening APMC auction sessions)
+        await asyncio.sleep(6 * 3600)
+
 @app.on_event("startup")
 async def startup_prewarm():
     """Pre-warm live data and AI client in background on startup."""
     try:
-        # 1. Fetch today's live Agmarknet Onion records from data.gov.in
-        asyncio.create_task(mandi_service.fetch_rates_from_gov_api(commodity="Onion", limit=30))
+        # 1. Start continuous periodic Agmarknet synchronization
+        asyncio.create_task(periodic_daily_mandi_sync())
         # 2. Pre-connect Gnani Evon client in worker thread so first query has zero latency
         loop = asyncio.get_running_loop()
         loop.run_in_executor(None, llm_service._get_evon_client)
@@ -114,7 +134,7 @@ class LLMGenerateRequest(BaseModel):
     query: str
     farmer_name: Optional[str] = "Kisan Bhai"
     village: Optional[str] = ""
-    district: Optional[str] = "Nashik"
+    district: Optional[str] = ""
     crops: Optional[list] = None
 
 class SummaryRequest(BaseModel):
@@ -177,6 +197,18 @@ async def websocket_call_endpoint(websocket: WebSocket):
             elif msg_type == "user_text":
                 await gateway.handle_user_text(data)
 
+            elif msg_type == "set_language":
+                lang = data.get("language", "en-US")
+                gateway.language = lang
+                dm_session = dialogue_manager.get_or_create_session(gateway.session_id)
+                dm_session.language = lang
+                if gateway.phone_number:
+                    try:
+                        farmer_db.update_farmer_profile(gateway.phone_number, language=lang)
+                    except Exception as e:
+                        print(f"[Main] Language profile update error: {e}")
+                await gateway.send_json({"type": "language_updated", "language": lang})
+
             elif msg_type == "reset_session":
                 dialogue_manager.reset_session(gateway.session_id)
                 await gateway.send_json({"type": "session_reset", "session_id": gateway.session_id})
@@ -201,6 +233,10 @@ async def chat_endpoint(req: ChatRequest):
     """
     if req.api_key:
         settings.GNANI_API_KEY = req.api_key.strip()
+
+    session = dialogue_manager.get_or_create_session(req.session_id)
+    if req.language:
+        session.language = req.language
 
     res = await dialogue_manager.process_utterance(req.session_id, req.utterance)
     
@@ -290,6 +326,41 @@ from app.services.telephony_bridge import telephony_bridge
 async def get_slip(session_id: str):
     session = dialogue_manager.get_or_create_session(session_id)
     return {"slip": session.mandi_slip, "evaluated_mandis": session.last_arbitrage_results}
+
+@app.get("/api/session/history/{session_id}")
+async def get_session_history(session_id: str):
+    """Retrieve full in-memory chat history and evaluated data for zero-loss session restoration."""
+    session = dialogue_manager.get_or_create_session(session_id)
+    return {
+        "session_id": session_id,
+        "chat_history": session.chat_history,
+        "language": getattr(session, "language", "en-US"),
+        "commodity": session.commodity,
+        "last_arbitrage_results": session.last_arbitrage_results
+    }
+
+class TranslateSessionRequest(BaseModel):
+    session_id: str
+    target_language: str
+    turns: Optional[List[Dict[str, Any]]] = None
+
+@app.post("/api/session/translate")
+async def translate_session_endpoint(req: TranslateSessionRequest):
+    """
+    Seamlessly translate the entire conversation history into the user's selected language.
+    Preserves all agricultural entities (mandi rates, APMC names, eNAM rules, ICAR dosages).
+    """
+    res = await dialogue_manager.translate_session(
+        session_id=req.session_id,
+        target_language=req.target_language,
+        turns=req.turns
+    )
+    return {
+        "status": "success",
+        "session_id": req.session_id,
+        "target_language": req.target_language,
+        "translated_turns": res
+    }
 
 # =====================================================================
 # FARMER ASSISTANT DATABASE & QUERY MEMORY

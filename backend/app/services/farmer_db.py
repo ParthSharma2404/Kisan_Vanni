@@ -160,7 +160,8 @@ class FarmerDatabase:
         state: Optional[str] = None,
         acreage: Optional[float] = None,
         primary_crops: Optional[List[str]] = None,
-        own_transport: Optional[str] = None
+        own_transport: Optional[str] = None,
+        language: Optional[str] = None
     ) -> Dict[str, Any]:
         phone = self.clean_phone(phone_number)
         existing = self.get_farmer(phone)
@@ -173,6 +174,7 @@ class FarmerDatabase:
         new_acreage = acreage if acreage is not None else (existing.get("acreage", 0.0) if existing else 0.0)
         new_crops = primary_crops if primary_crops is not None else (existing.get("primary_crops", []) if existing else [])
         new_transport = own_transport if own_transport is not None else (existing.get("own_transport", "") if existing else "")
+        new_lang = language if language is not None else (existing.get("language", "en-US") if existing else "en-US")
 
         farmer_record = {
             "phone_number": phone,
@@ -183,6 +185,7 @@ class FarmerDatabase:
             "acreage": new_acreage,
             "primary_crops": new_crops,
             "own_transport": new_transport,
+            "language": new_lang,
             "updated_at": now_ts
         }
 
@@ -367,19 +370,23 @@ class FarmerDatabase:
         - greeting_text: str
         """
         farmer = self.get_farmer(phone_number)
-        if not farmer:
-            return {
-                "is_new": True,
-                "farmer": None,
-                "greeting_text": "Namaste Kisan Bhai, boliye!"
-            }
+        lang = farmer.get("language", "en-US") if farmer else "en-US"
+        name = farmer.get("name") if farmer and farmer.get("name") != "Kisan Bhai" else None
 
-        name = farmer.get("name") or "Kisan Bhai"
+        if "hi" in (lang or "").lower() or "hinglish" in (lang or "").lower():
+            salutation = f"Namaste {name} ji" if name else "Namaste Kisan Bhai"
+            greeting = f"{salutation}, boliye! Aaj mandi bhav ya fasal me kaise madad kar sakta hoon?"
+        elif "pa" in (lang or "").lower():
+            salutation = f"Sat Sri Akal {name} ji" if name else "Sat Sri Akal Kisan Veer ji"
+            greeting = f"{salutation}, dasso! Aaj mandi de bhaav ya fasal baare ki jaankari chahidi hai?"
+        else:
+            salutation = f"Hello {name}" if name else "Hello Farmer"
+            greeting = f"{salutation}, welcome to Kisan-Vaani! How can I assist you with mandi prices or crop advisory today?"
 
         return {
-            "is_new": False,
+            "is_new": not bool(farmer),
             "farmer": farmer,
-            "greeting_text": f"Namaste {name} ji, boliye!"
+            "greeting_text": greeting
         }
 
 farmer_db = FarmerDatabase()

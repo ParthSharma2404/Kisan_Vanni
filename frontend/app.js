@@ -11,6 +11,21 @@ let sessionId = "";
 let socket = null;
 let currentAudio = null;
 
+// User Preferred Language (Default: English)
+let currentLanguage = localStorage.getItem("kisan_preferred_language") || "en-US";
+
+const LANGUAGE_LABELS = {
+  "en-US": "English",
+  "hi-IN": "हिन्दी",
+  "hinglish": "Hinglish",
+  "pa-IN": "ਪੰਜਾਬੀ",
+  "mr-IN": "मराठी",
+  "te-IN": "తెలుగు",
+  "ta-IN": "தமிழ்",
+  "gu-IN": "ગુજરાતી",
+  "bn-IN": "বাংলা"
+};
+
 // Microphone & VAD State
 let isRecording = false;
 let isAiSpeaking = false;
@@ -160,6 +175,200 @@ const SoundFX = {
 };
 
 // =====================================================================
+// 0. MULTI-LINGUAL PREFERENCE & SELECTOR
+// =====================================================================
+function initLanguageSelector() {
+  const langSelectorBtn = document.getElementById("langSelectorBtn");
+  const langDropdownMenu = document.getElementById("langDropdownMenu");
+  const currentLangLabel = document.getElementById("currentLangLabel");
+  const langOptions = document.querySelectorAll(".lang-option");
+
+  // Sync initial UI with stored preference
+  if (currentLangLabel) {
+    currentLangLabel.innerText = LANGUAGE_LABELS[currentLanguage] || "English";
+  }
+
+  langOptions.forEach(opt => {
+    if (opt.getAttribute("data-lang") === currentLanguage) {
+      opt.classList.add("active");
+    } else {
+      opt.classList.remove("active");
+    }
+  });
+
+  if (langSelectorBtn && langDropdownMenu) {
+    langSelectorBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isVisible = langDropdownMenu.style.display === "flex";
+      langDropdownMenu.style.display = isVisible ? "none" : "flex";
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!langSelectorBtn.contains(e.target) && !langDropdownMenu.contains(e.target)) {
+        langDropdownMenu.style.display = "none";
+      }
+    });
+
+    langOptions.forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const prevLang = currentLanguage;
+        const selectedLang = btn.getAttribute("data-lang");
+        const label = btn.getAttribute("data-label") || LANGUAGE_LABELS[selectedLang] || selectedLang;
+        
+        currentLanguage = selectedLang;
+        localStorage.setItem("kisan_preferred_language", currentLanguage);
+        
+        if (currentLangLabel) currentLangLabel.innerText = label;
+        langOptions.forEach(o => o.classList.toggle("active", o === btn));
+        langDropdownMenu.style.display = "none";
+
+        stopAnyCurrentAudio();
+
+        // Dispatch set_language to backend WebSocket
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({
+            type: "set_language",
+            language: currentLanguage
+          }));
+        }
+
+        console.log(`[Language] User preferred language updated to: ${currentLanguage}`);
+
+        // Always trigger conversation transition so any mixed-language turns are fully harmonized
+        transitionConversationLanguage(selectedLang);
+      });
+    });
+  }
+}
+
+// =====================================================================
+// DYNAMIC CONVERSATION LANGUAGE TRANSITION
+// =====================================================================
+function showLanguageToast(msg) {
+  let toast = document.getElementById("langToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "langToast";
+    toast.className = "lang-transition-toast";
+    document.body.appendChild(toast);
+  }
+  toast.innerText = msg;
+  toast.classList.add("visible");
+  setTimeout(() => {
+    toast.classList.remove("visible");
+  }, 2600);
+}
+
+function renderMessagesInPlace(messages) {
+  if (!dynamicMessagesContainer) return;
+  dynamicMessagesContainer.innerHTML = "";
+  for (const msg of messages) {
+    if (msg.role === "user") {
+      renderUserMessage(msg.text, false);
+    } else {
+      renderAiCard(msg.text, msg.extra || {}, false);
+    }
+  }
+  scrollToBottom();
+}
+
+async function transitionConversationLanguage(targetLang) {
+  const langLabel = LANGUAGE_LABELS[targetLang] || targetLang;
+  const todayKey = getTodayDateKey();
+  const effectivePhone = activePhone || localStorage.getItem("kisan_auth_phone") || "guest";
+  const storageKey = `kisan_chat_${effectivePhone}_${todayKey}`;
+
+  // 1. Gather all currently visible message rows from DOM
+  const rows = dynamicMessagesContainer ? Array.from(dynamicMessagesContainer.querySelectorAll(".chat-message-row")) : [];
+  if (rows.length === 0) {
+    showLanguageToast(`Language switched to ${langLabel}`);
+    return;
+  }
+
+  showLanguageToast(`Translating conversation to ${langLabel}...`);
+  rows.forEach(r => r.classList.add("translating"));
+
+  // Read existing history to retain timestamps and rich widgets metadata (extra)
+  let history = [];
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw) history = JSON.parse(raw);
+  } catch(e) { history = []; }
+
+  // Extract turn texts directly from the DOM elements
+  const turnsPayload = rows.map((r, i) => {
+    const isUser = r.classList.contains("user-row");
+    let text = "";
+    if (isUser) {
+      const bubble = r.querySelector(".user-bubble");
+      text = bubble ? bubble.innerText.trim() : r.innerText.trim();
+    } else {
+      const audioBtn = r.querySelector(".btn-card-audio");
+      if (audioBtn && audioBtn.getAttribute("data-text")) {
+        text = audioBtn.getAttribute("data-text").trim();
+      } else {
+        const ps = r.querySelectorAll(".card-p");
+        if (ps.length > 0) {
+          text = Array.from(ps).map(p => p.innerText.trim()).join("\n");
+        } else {
+          text = r.innerText.trim();
+        }
+      }
+    }
+    const extra = (history[i] && history[i].extra) ? history[i].extra : {};
+    return {
+      id: i,
+      role: isUser ? "user" : "assistant",
+      text: text,
+      extra: extra
+    };
+  });
+
+  // Request batch translation from backend
+  try {
+    const currentSession = sessionId || `call_${effectivePhone}_${todayKey.replace(/-/g, '')}`;
+    const res = await fetch(`${API_BASE}/api/session/translate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: currentSession,
+        target_language: targetLang,
+        turns: turnsPayload
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === "success" && data.translated_turns) {
+        const translated = data.translated_turns;
+        const updatedHistory = turnsPayload.map((t, i) => {
+          const match = translated.find(m => m.id === i);
+          const newText = match && match.text ? match.text : t.text;
+          return {
+            role: t.role,
+            text: newText,
+            time: (history[i] && history[i].time) || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            extra: t.extra || {}
+          };
+        });
+
+        // Re-render chat container with translated turns & preserved widgets
+        renderMessagesInPlace(updatedHistory);
+        try { localStorage.setItem(storageKey, JSON.stringify(updatedHistory)); } catch(e) {}
+
+        showLanguageToast(`Conversation switched to ${langLabel}`);
+      }
+    }
+  } catch (err) {
+    console.warn("[Translation] Fetch error:", err);
+  } finally {
+    const newRows = dynamicMessagesContainer ? dynamicMessagesContainer.querySelectorAll(".chat-message-row") : [];
+    newRows.forEach(r => r.classList.remove("translating"));
+  }
+}
+
+// =====================================================================
 // 1. 24-HOUR EPHEMERAL STORAGE & AUTHENTICATION
 function getTodayDateKey() {
   // Explicitly locked to Indian Standard Time (IST / Asia/Kolkata / UTC+5:30)
@@ -202,7 +411,7 @@ function initSessionAndStorage() {
   }
 }
 
-function saveTodayChatMessage(role, text, extra = {}, audioBase64 = "") {
+function saveTodayChatMessage(role, text, extra = {}) {
   const todayKey = getTodayDateKey();
   const storageKey = `kisan_chat_${activePhone}_${todayKey}`;
   let history = [];
@@ -219,26 +428,36 @@ function saveTodayChatMessage(role, text, extra = {}, audioBase64 = "") {
     }
   }
 
-  history.push({ role, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), extra, audio_base64: audioBase64 });
+  // Lightweight storage: store only text and metadata, never raw base64 audio
+  history.push({ 
+    role, 
+    text, 
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+    extra: extra || {} 
+  });
+
   try {
     localStorage.setItem(storageKey, JSON.stringify(history));
-  } catch (e) {}
+  } catch (e) {
+    console.warn("[Storage] localStorage quota reached or write error:", e);
+  }
 }
 
-function loadTodayChatHistory() {
+async function loadTodayChatHistory() {
   const todayKey = getTodayDateKey();
   const storageKey = `kisan_chat_${activePhone}_${todayKey}`;
+  let renderedLocally = false;
+
   try {
     const existing = localStorage.getItem(storageKey);
     if (existing) {
       const messages = JSON.parse(existing);
       if (dynamicMessagesContainer) dynamicMessagesContainer.innerHTML = "";
       
-      // Deduplicate repeat initial greetings from earlier reloads
       let hasGreeting = false;
       const cleanMessages = [];
       for (const msg of messages) {
-        const isGreeting = msg.text && msg.text.includes("Namaste Kisan Bhai ji, boliye");
+        const isGreeting = msg.text && (msg.text.includes("Namaste Kisan") || msg.text.includes("Welcome to Kisan-Vaani"));
         if (isGreeting) {
           if (!hasGreeting) {
             hasGreeting = true;
@@ -253,12 +472,39 @@ function loadTodayChatHistory() {
         if (msg.role === "user") {
           renderUserMessage(msg.text, false);
         } else {
-          renderAiCard(msg.text, msg.extra || {}, false, msg.audio_base64 || "");
+          renderAiCard(msg.text, msg.extra || {}, false);
         }
       }
+      if (cleanMessages.length > 0) renderedLocally = true;
       scrollToBottom();
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn("[Storage] Local load error:", e);
+  }
+
+  // Synchronize with server session history to ensure zero loss
+  if (sessionId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/session/history/${sessionId}`);
+      if (res.ok) {
+        const serverData = await res.json();
+        const serverHistory = serverData.chat_history || [];
+        if (!renderedLocally && serverHistory.length > 0) {
+          if (dynamicMessagesContainer) dynamicMessagesContainer.innerHTML = "";
+          for (const item of serverHistory) {
+            if (item.role === "user") {
+              renderUserMessage(item.content, false);
+            } else if (item.role === "assistant") {
+              renderAiCard(item.content, item.extra || {}, false);
+            }
+          }
+          scrollToBottom();
+        }
+      }
+    } catch (err) {
+      console.debug("[Storage] Server history sync note:", err);
+    }
+  }
 }
 
 // =====================================================================
@@ -272,21 +518,21 @@ function setTurnState(state, message = "") {
   if (state === "speaking") {
     // AI is speaking -> Mic MUST be safely locked to avoid echo & noise
     isAiSpeaking = true;
-    if (turnStatusText) turnStatusText.innerText = message || "AI Buddy बोल रहा है... (माइक बंद है)";
+    if (turnStatusText) turnStatusText.innerText = message || "AI Buddy speaking... (Mic muted)";
     if (mainMicBtn) {
       mainMicBtn.className = "dock-mic-btn locked";
-      mainMicBtn.setAttribute("title", "AI बोल रहा है...");
+      mainMicBtn.setAttribute("title", "AI is speaking...");
     }
     if (micIconHolder) micIconHolder.innerHTML = MIC_LOCKED_SVG;
-    if (activeStatusText) activeStatusText.innerText = "AI Speaking...";
+    if (activeStatusText) activeStatusText.innerText = "Speaking...";
   } 
   else if (state === "reasoning") {
     // AI is computing/reasoning -> Mic locked
     isAiSpeaking = true;
-    if (turnStatusText) turnStatusText.innerText = message || "AI सोच रहा है...";
+    if (turnStatusText) turnStatusText.innerText = message || "AI reasoning...";
     if (mainMicBtn) {
       mainMicBtn.className = "dock-mic-btn locked";
-      mainMicBtn.setAttribute("title", "AI सोच रहा है...");
+      mainMicBtn.setAttribute("title", "AI reasoning...");
     }
     if (micIconHolder) micIconHolder.innerHTML = MIC_LOCKED_SVG;
     if (activeStatusText) activeStatusText.innerText = "Reasoning...";
@@ -298,10 +544,10 @@ function setTurnState(state, message = "") {
     // Farmer is actively speaking
     isAiSpeaking = false;
     if (reasoningIndicator) reasoningIndicator.style.display = "none";
-    if (turnStatusText) turnStatusText.innerText = message || "🎙️ सुन रहा हूँ... बोलिए (बोलना पूरा होने पर रुकें या बटन दबाएं)";
+    if (turnStatusText) turnStatusText.innerText = message || "🎙️ Listening... speak now (tap to stop or pause for 2s)";
     if (mainMicBtn) {
       mainMicBtn.className = "dock-mic-btn recording";
-      mainMicBtn.setAttribute("title", "बोलना पूरा करने के लिए दबाएं या 2 सेकंड शांत रहें");
+      mainMicBtn.setAttribute("title", "Tap when finished speaking");
     }
     if (micIconHolder) micIconHolder.innerHTML = MIC_IDLE_SVG;
     if (activeStatusText) activeStatusText.innerText = "Listening...";
@@ -310,10 +556,10 @@ function setTurnState(state, message = "") {
     // READY: AI has ended speech -> Mic unlocked and ready
     isAiSpeaking = false;
     if (reasoningIndicator) reasoningIndicator.style.display = "none";
-    if (turnStatusText) turnStatusText.innerText = "माइक तैयार है • बोलें या लिखें";
+    if (turnStatusText) turnStatusText.innerText = "Mic ready • Tap to speak or type";
     if (mainMicBtn) {
       mainMicBtn.className = "dock-mic-btn ready";
-      mainMicBtn.setAttribute("title", "बोलने के लिए दबाएं");
+      mainMicBtn.setAttribute("title", "Tap to speak");
     }
     if (micIconHolder) micIconHolder.innerHTML = MIC_IDLE_SVG;
     if (activeStatusText) activeStatusText.innerText = "Online • Ready";
@@ -355,6 +601,240 @@ function renderUserMessage(text, save = true) {
   if (save) saveTodayChatMessage("user", text);
 }
 
+function capitalize(str) {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+const CROP_ICONS = {
+  soyabean: "🌱", soybean: "🌱",
+  cotton: "🌾", kapas: "🌾",
+  groundnut: "🥜", mungfali: "🥜",
+  tomato: "🍅", tamatar: "🍅",
+  onion: "🧅", pyaaz: "🧅",
+  potato: "🥔", aloo: "🥔",
+  wheat: "🌾", gehun: "🌾",
+  mustard: "🌼", sarson: "🌼",
+  chana: "🧆", gram: "🧆",
+  chilli: "🌶️", mirch: "🌶️",
+  garlic: "🧄", lahsun: "🧄",
+  maize: "🌽", makka: "🌽",
+  paddy: "🌾", dhan: "🌾"
+};
+
+const CROP_DISPLAY_NAMES = {
+  soyabean: "सोयाबीन (Soybean)",
+  soybean: "सोयाबीन (Soybean)",
+  cotton: "कपास (Cotton)",
+  groundnut: "मूंगफली (Groundnut)",
+  tomato: "टमाटर (Tomato)",
+  onion: "प्याज (Onion)",
+  potato: "आलू (Potato)",
+  wheat: "गेहूं (Wheat)",
+  mustard: "सरसों (Mustard)",
+  chana: "चना (Gram)",
+  chilli: "हरी मिर्च (Chilli)",
+  garlic: "लहसुन (Garlic)",
+  maize: "मक्का (Maize)",
+  paddy: "धान (Paddy)"
+};
+
+function buildMandiHeroWidget(extra) {
+  if (!extra || !extra.evaluated_mandis || !extra.evaluated_mandis.length) return "";
+  const mandis = extra.evaluated_mandis;
+  const top = mandis[0];
+  if (!top || !top.mandi_name) return "";
+
+  const commName = extra.commodity ? capitalize(extra.commodity) : "Crop";
+  const modalFormatted = Math.round(top.modal_price || 0).toLocaleString('en-IN');
+  const netFormatted = Math.round(top.net_rate_per_quintal || top.modal_price || 0).toLocaleString('en-IN');
+  const netInHandFormatted = Math.round(top.net_in_hand || 0).toLocaleString('en-IN');
+  const dist = top.distance_km ? `${top.distance_km} km` : "Local Mandi";
+  const locDisplay = `${top.mandi_name}${top.district ? ' (' + top.district + ')' : ''}`;
+
+  let secondaryHtml = "";
+  if (mandis.length > 1) {
+    const others = mandis.slice(1, 3);
+    const rows = others.map(m => `
+      <div class="mandi-compare-row">
+        <span class="mandi-compare-name">${escapeHtml(m.mandi_name || 'APMC')}</span>
+        <span class="mandi-compare-rate">₹${Math.round(m.modal_price).toLocaleString('en-IN')} <span class="sub-rate">(${m.distance_km}km)</span></span>
+        <span class="mandi-compare-net">In-hand: ₹${Math.round(m.net_rate_per_quintal).toLocaleString('en-IN')}</span>
+      </div>
+    `).join("");
+
+    secondaryHtml = `
+      <div class="mandi-compare-grid">
+        <div class="mandi-compare-title">Compare with nearby mandis:</div>
+        ${rows}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="mandi-hero-card">
+      <div class="mandi-hero-header">
+        <div class="mandi-hero-location">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+          <span>${escapeHtml(locDisplay)}</span>
+        </div>
+        <span class="mandi-top-pill">Best Realization</span>
+      </div>
+
+      <div class="mandi-hero-price-row">
+        <span class="mandi-hero-price">₹${modalFormatted}</span>
+        <span class="mandi-hero-unit">/ quintal (${escapeHtml(commName)} modal rate)</span>
+      </div>
+
+      <div class="mandi-stats-chips">
+        <div class="mandi-stat-chip emerald">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>In-hand: ₹${netFormatted}/qtl</span>
+        </div>
+        <div class="mandi-stat-chip">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>Distance: ${dist}</span>
+        </div>
+        ${extra.quantity_quintals ? `
+        <div class="mandi-stat-chip">
+          <span>Est. Total: ₹${netInHandFormatted} (${extra.quantity_quintals} qtl)</span>
+        </div>` : ''}
+      </div>
+
+      ${secondaryHtml}
+    </div>
+  `;
+}
+
+function buildMultiCropWidget(extra) {
+  if (!extra) return "";
+  const multiRates = extra.multi_crop_rates || {};
+  const crops = extra.crops || [];
+  
+  if (Object.keys(multiRates).length === 0 && crops.length <= 1) return "";
+
+  const cropKeys = Object.keys(multiRates).length > 0 ? Object.keys(multiRates) : crops;
+  if (cropKeys.length <= 1) return "";
+
+  const cardsHtml = cropKeys.map(crop => {
+    const icon = CROP_ICONS[crop.toLowerCase()] || "🌱";
+    const displayName = capitalize(crop);
+    const rates = multiRates[crop];
+    let priceText = "Check Rate";
+    let subText = "Tap to view";
+    if (rates && rates.length > 0) {
+      priceText = `₹${Math.round(rates[0].modal_price).toLocaleString('en-IN')}`;
+      subText = `${rates[0].market || 'APMC'} /qtl`;
+    }
+
+    return `
+      <div class="crop-rate-card" onclick="handleQuickChipClick('What is the current mandi rate of ${escapeHtml(crop)}?')">
+        <div class="crop-card-top">
+          <span class="crop-card-emoji">${icon}</span>
+          <span class="crop-card-name">${escapeHtml(displayName)}</span>
+        </div>
+        <div class="crop-card-rate">${priceText}</div>
+        <div class="crop-card-sub">${subText}</div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="multi-crop-container">
+      <div class="multi-crop-title">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span>Live Crop Price Comparison:</span>
+      </div>
+      <div class="multi-crop-grid">
+        ${cardsHtml}
+      </div>
+    </div>
+  `;
+}
+
+function buildIcarWidget(extra) {
+  if (!extra || !extra.icar_facts) return "";
+  const facts = extra.icar_facts;
+  if (!facts.chemical_cure && !facts.organic_cure && !facts.topic) return "";
+
+  const topic = facts.topic || extra.issue || "Crop Advisory";
+  const organic = facts.organic_cure;
+  const chemical = facts.chemical_cure;
+  const dosage = facts.dosage;
+  const waiting = facts.waiting_period_days;
+
+  return `
+    <div class="icar-rx-card">
+      <div class="icar-rx-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>ICAR Scientific Diagnosis</span>
+      </div>
+      <div class="icar-rx-title">${escapeHtml(topic)}</div>
+      <div class="icar-rx-boxes">
+        ${organic ? `
+        <div class="icar-rx-box">
+          <strong>🌿 Organic Treatment:</strong> ${escapeHtml(organic)}
+        </div>` : ''}
+        ${chemical ? `
+        <div class="icar-rx-box chemical">
+          <strong>🧪 Chemical Remedy:</strong> ${escapeHtml(chemical)} ${dosage ? `(${escapeHtml(dosage)})` : ''}
+        </div>` : ''}
+      </div>
+      ${waiting ? `
+      <div class="icar-rx-footer">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>Waiting Period: <strong>${waiting} days</strong></span>
+      </div>` : ''}
+    </div>
+  `;
+}
+
+function buildQuickChips(extra, text) {
+  const chips = [];
+  const multiRates = extra.multi_crop_rates || {};
+  const crops = extra.crops || [];
+  const cropKeys = Object.keys(multiRates).length > 0 ? Object.keys(multiRates) : crops;
+
+  if (cropKeys.length > 1) {
+    for (const c of cropKeys.slice(0, 3)) {
+      const icon = CROP_ICONS[c.toLowerCase()] || "🔍";
+      const name = capitalize(c);
+      chips.push({ label: `${icon} ${name} Rate`, query: `What is the current mandi rate of ${c}?` });
+    }
+  }
+
+  if (extra.evaluated_mandis && extra.evaluated_mandis.length > 0) {
+    chips.push({ label: "📄 Send Mandi Slip", query: "send today's mandi receipt summary" });
+    chips.push({ label: "⚖️ eNAM 0% Rights", query: "what is farmer zero percent commission right under eNAM?" });
+  }
+
+  if (extra.icar_facts && (extra.icar_facts.chemical_cure || extra.icar_facts.organic_cure)) {
+    chips.push({ label: "🌿 Organic Spray Guide", query: "how to apply organic treatment?" });
+    chips.push({ label: "⏱️ Best Spray Time", query: "what is the ideal time for spraying?" });
+  }
+
+  if (chips.length === 0) {
+    return "";
+  }
+
+  const chipsHtml = chips.map(c => `
+    <button class="quick-chip" onclick="handleQuickChipClick('${escapeHtml(c.query)}')">
+      <span>${escapeHtml(c.label)}</span>
+    </button>
+  `).join("");
+
+  return `<div class="quick-action-chips">${chipsHtml}</div>`;
+}
+
+window.handleQuickChipClick = function(chipText) {
+  if (!chipText) return;
+  stopAnyCurrentAudio();
+  if (chatTextInput) {
+    chatTextInput.value = chipText;
+    submitUserText();
+  }
+};
+
 function renderAiCard(text, extra = {}, save = true, audioBase64 = "") {
   if (!dynamicMessagesContainer || !text) return;
   if (reasoningIndicator) reasoningIndicator.style.display = "none";
@@ -362,23 +842,31 @@ function renderAiCard(text, extra = {}, save = true, audioBase64 = "") {
   const row = document.createElement("div");
   row.className = "chat-message-row ai-row";
 
-  let badge = "AI Krishi Scientist";
-  if (extra.topic) badge = extra.topic;
-  else if (extra.commodity) badge = `${extra.commodity.toUpperCase()} Mandi Bhav`;
+  const formattedSpeech = formatMarkdownText(text, extra);
+  const mandiHero = buildMandiHeroWidget(extra);
+  const multiCrops = buildMultiCropWidget(extra);
+  const icarWidget = buildIcarWidget(extra);
+  const quickChips = buildQuickChips(extra, text);
 
   row.innerHTML = `
-    <div class="msg-avatar">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--neon-lime)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-      </svg>
-    </div>
     <div class="msg-card ai-card">
-      <div class="card-header-badge">${escapeHtml(badge)}</div>
-      <div class="card-content">${formatMarkdownText(text, extra)}</div>
+      <div class="ai-card-meta">
+        <div class="ai-brand-pill">
+          <img src="assets/logo_emblem_carbon.png" alt="KV" class="ai-emblem-mini">
+          <span class="ai-brand-name">KISAN VAANI</span>
+        </div>
+      </div>
+      <div class="card-content">
+        ${formattedSpeech}
+        ${mandiHero}
+        ${multiCrops}
+        ${icarWidget}
+      </div>
+      ${quickChips}
       <div class="card-actions">
         <button class="btn-card-audio" onclick="replayAiText(this)" data-text="${escapeHtml(text)}" data-audio="${audioBase64 || ''}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-          <span>दोबारा सुनें</span>
+          <span>Listen again</span>
         </button>
       </div>
     </div>
@@ -386,7 +874,7 @@ function renderAiCard(text, extra = {}, save = true, audioBase64 = "") {
   dynamicMessagesContainer.appendChild(row);
   scrollToBottom();
 
-  if (save) saveTodayChatMessage("assistant", text, extra, audioBase64);
+  if (save) saveTodayChatMessage("assistant", text, extra);
 }
 
 function formatMarkdownText(raw, extra = {}) {
@@ -477,11 +965,7 @@ function formatMarkdownText(raw, extra = {}) {
         </div>
       `;
     } else {
-      // Split sentences cleanly (by danda ।, period preceded by word or parenthesis, or exclamation mark)
-      const sentences = line.split(/(?<=[।!])\s+|(?<=[a-zA-Z\u0900-\u097F\)])\.\s+/).filter(s => s.trim().length > 0);
-      for (const s of sentences) {
-        remainingParas.push(`<p class="card-p">${s.trim()}</p>`);
-      }
+      remainingParas.push(`<p class="card-p">${line.trim()}</p>`);
     }
   }
 
@@ -520,7 +1004,7 @@ function connectWebSocket() {
         type: "start_call",
         session_id: sessionId,
         phone_number: activePhone,
-        language: "hi-IN"
+        language: currentLanguage
       }));
       setTurnState("ready");
     };
@@ -536,7 +1020,7 @@ function connectWebSocket() {
 
     socket.onclose = () => {
       console.log("[WebSocket] Closed. Reconnecting in 3s...");
-      setTurnState("ready", "पुनः कनेक्ट हो रहा है...");
+      setTurnState("ready", "Reconnecting...");
       setTimeout(connectWebSocket, 3000);
     };
 
@@ -600,7 +1084,7 @@ async function playGnaniAudio(text, base64Wav = null, activeBtn = null) {
     activeBtn.classList.add("playing");
     activeBtn.innerHTML = `
       <div class="audio-wave-bars"><span></span><span></span><span></span><span></span></div>
-      <span>सुन रहे हैं...</span>
+      <span>Playing audio...</span>
     `;
   }
 
@@ -617,15 +1101,19 @@ async function playGnaniAudio(text, base64Wav = null, activeBtn = null) {
     return;
   }
 
-  // 3. Synthesize via official Gnani Timbre v3.0 API (Shivani voice)
+  // 3. Synthesize via official Gnani Timbre v3.0 API
   try {
+    const isEnglish = currentLanguage === "en-US" || currentLanguage === "en-IN";
+    const voiceName = "Shivani"; // Official Timbre v3.0 neural voice supporting English (en-IN) and Indic
+    const ttsLang = isEnglish ? "en-IN" : currentLanguage;
+
     const res = await fetch(`${API_BASE}/api/tts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text: text,
-        language: "hi-IN",
-        voice: "Shivani"
+        language: ttsLang,
+        voice: voiceName
       })
     });
 
@@ -682,7 +1170,7 @@ function finishAudioPlayback(activeBtn) {
     activeBtn.classList.remove("playing");
     activeBtn.innerHTML = `
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-      <span>दोबारा सुनें</span>
+      <span>Listen again</span>
     `;
   }
   setTurnState("ready");
@@ -708,7 +1196,7 @@ async function toggleMicrophone() {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: "barge_in" }));
     }
-    setTurnState("ready", "AI रोका गया • अब बोलें");
+    setTurnState("ready", "AI stopped • Tap to speak");
     return;
   }
 
@@ -831,7 +1319,7 @@ function stopRecordingAndSend() {
     return;
   }
 
-  setTurnState("reasoning", "प्रश्नोत्तर संसाधित हो रहा है...");
+  setTurnState("reasoning", "Processing advisory...");
 
   const wavBlob = encodeResampled16kWAV(resampled16k);
   const reader = new FileReader();
@@ -927,7 +1415,7 @@ function submitUserText() {
 
   renderUserMessage(text);
   SoundFX.playSend();
-  setTurnState("reasoning", "उत्तर तैयार हो रहा है...");
+  setTurnState("reasoning", "Preparing answer...");
 
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
@@ -945,7 +1433,7 @@ function submitUserText() {
 // 8. SMART WHATSAPP DAILY SUMMARY MODAL
 // =====================================================================
 async function triggerDailyWhatsAppSummary() {
-  setTurnState("reasoning", "आज का सारांश तैयार हो रहा है...");
+  setTurnState("reasoning", "Compiling daily summary...");
   try {
     const res = await fetch(`${API_BASE}/api/session/whatsapp_summary`, {
       method: "POST",
@@ -975,6 +1463,7 @@ function showDailySummaryModal(text, url) {
 // 9. EVENT LISTENERS
 // =====================================================================
 document.addEventListener("DOMContentLoaded", () => {
+  initLanguageSelector();
   initSessionAndStorage();
 
   // Login form submit
@@ -983,7 +1472,7 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       const phone = loginPhoneInput.value.replace(/\D/g, "");
       if (phone.length !== 10) {
-        alert("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।");
+        alert("Please enter a valid 10-digit mobile number.");
         return;
       }
       localStorage.setItem("kisan_auth_phone", phone);

@@ -16,8 +16,8 @@ class SessionState:
         self.state: Optional[str] = None
         self.district: Optional[str] = None
         self.location_name: Optional[str] = None
-        self.lat: float = 20.0800
-        self.lon: float = 74.1100
+        self.lat: Optional[float] = None
+        self.lon: Optional[float] = None
         self.location_confirmed: bool = False
         
         self.commodity: Optional[str] = None
@@ -29,14 +29,28 @@ class SessionState:
         self.has_own_vehicle: Optional[bool] = None
         self.vehicle_name: Optional[str] = None
         self.step: str = "ACTIVE"
+        self.language: str = "en-US"
         self.last_arbitrage_results: List[Dict[str, Any]] = []
         self.mandi_slip: Optional[Dict[str, Any]] = None
-        self.chat_history: List[Dict[str, str]] = []  # Rolling Buffer Window Memory (max 6 exchanges)
+        self.chat_history: List[Dict[str, Any]] = []  # Rolling Buffer Window Memory
+        self.translation_cache: Dict[str, Dict[int, str]] = {}  # {lang: {turn_id: text}}
 
-    def add_history(self, role: str, content: str):
-        self.chat_history.append({"role": role, "content": content})
-        if len(self.chat_history) > 6:
-            self.chat_history = self.chat_history[-6:]
+    def add_history(self, role: str, content: str, extra: Optional[Dict[str, Any]] = None):
+        turn_idx = len(self.chat_history)
+        self.chat_history.append({
+            "id": turn_idx,
+            "role": role,
+            "content": content,
+            "text": content,
+            "extra": extra or {}
+        })
+        curr_lang = getattr(self, "language", "en-US") or "en-US"
+        if curr_lang not in self.translation_cache:
+            self.translation_cache[curr_lang] = {}
+        self.translation_cache[curr_lang][turn_idx] = content
+
+        if len(self.chat_history) > 30:
+            self.chat_history = self.chat_history[-30:]
 
 class DialogueManager:
     def __init__(self):
@@ -55,6 +69,8 @@ class DialogueManager:
                     if f_rec:
                         if f_rec.get("name") and f_rec["name"] != "Kisan Bhai":
                             session.farmer_name = f_rec["name"]
+                        if f_rec.get("language"):
+                            session.language = f_rec["language"]
                         loc = f_rec.get("village") or f_rec.get("district")
                         if loc:
                             session.location_name = loc
@@ -92,6 +108,74 @@ class DialogueManager:
     def reset_session(self, session_id: str):
         if session_id in self.sessions:
             del self.sessions[session_id]
+
+    async def translate_session(
+        self,
+        session_id: str,
+        target_language: str,
+        turns: Optional[List[Dict[str, Any]]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Translates conversation turns in session to target_language using fast batch translation.
+        Preserves all agricultural entities (mandi rates, APMC names, eNAM rules, chemical cures).
+        """
+        session = self.get_or_create_session(session_id)
+        session.language = target_language
+
+        # Use client-provided turns if available, otherwise fallback to in-memory session history
+        turns_to_translate = []
+        if turns and len(turns) > 0:
+            turns_to_translate = turns
+        elif len(session.chat_history) > 0:
+            turns_to_translate = [
+                {
+                    "id": idx,
+                    "role": turn.get("role", "user"),
+                    "text": turn.get("content") or turn.get("text", ""),
+                    "extra": turn.get("extra", {})
+                }
+                for idx, turn in enumerate(session.chat_history)
+            ]
+
+        if not turns_to_translate:
+            return []
+
+        from app.services.llm_service import llm_service
+        try:
+            translated_batch = await llm_service.translate_conversation(turns_to_translate, target_language)
+            trans_map = {}
+            for item in translated_batch:
+                tid = item.get("id")
+                ttext = item.get("text")
+                if tid is not None and ttext:
+                    trans_map[int(tid)] = ttext
+
+            result = []
+            for t in turns_to_translate:
+                tid = int(t.get("id", len(result)))
+                new_text = trans_map.get(tid, t.get("text") or t.get("content", ""))
+                result.append({
+                    "id": tid,
+                    "role": t.get("role", "user"),
+                    "text": new_text,
+                    "content": new_text,
+                    "extra": t.get("extra", {})
+                })
+
+            # Update session chat_history with translated content
+            session.chat_history = []
+            for item in result:
+                session.chat_history.append({
+                    "role": item["role"],
+                    "content": item["text"],
+                    "text": item["text"],
+                    "extra": item.get("extra", {})
+                })
+
+            return result
+        except Exception as e:
+            print(f"[DialogueManager:Translate] Error: {e}")
+            return turns_to_translate
 
     async def process_utterance(self, session_id: str, utterance: str) -> Dict[str, Any]:
         """
@@ -151,7 +235,7 @@ class DialogueManager:
         from app.services.agri_router import agri_router
         res = await agri_router.route_and_execute(utterance, session)
         if res and res.get("spoken_text"):
-            session.add_history("assistant", res["spoken_text"])
+            session.add_history("assistant", res["spoken_text"], extra=res.get("data", {}))
         return res
 
 

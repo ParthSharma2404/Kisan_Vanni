@@ -1,22 +1,23 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Kisan-Vaani | AI Buddy Voice & Chat Agri-Intelligence</title>
+  <title>Kisan Vaani | Sovereign AI Krishi & Voice Companion</title>
   <meta name="description" content="Sovereign AI Krishi Buddy for Indian Farmers. Live Agmarknet mandi rates, ICAR disease remedies, and eNAM 0% commission rights.">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=22">
 </head>
 <body class="ai-buddy-body">
   <!-- Faint topographic background contours -->
   <div class="topo-lines-bg">
     <svg viewBox="0 0 400 120" preserveAspectRatio="none" class="topo-svg">
-      <path d="M-50,20 C50,5 150,35 250,15 C350,-5 450,25 500,10" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1.2"/>
-      <path d="M-50,50 C60,30 160,60 260,35 C360,15 460,55 500,30" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1.2"/>
-      <path d="M-50,80 C80,65 180,95 280,65 C380,45 480,80 500,60" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1.2"/>
+      <path d="M-50,20 C50,5 150,35 250,15 C350,-5 450,25 500,10" fill="none" stroke="rgba(12,42,45,0.06)" stroke-width="1.2"/>
+      <path d="M-50,50 C60,30 160,60 260,35 C360,15 460,55 500,30" fill="none" stroke="rgba(12,42,45,0.05)" stroke-width="1.2"/>
+      <path d="M-50,80 C80,65 180,95 280,65 C380,45 480,80 500,60" fill="none" stroke="rgba(12,42,45,0.04)" stroke-width="1.2"/>
     </svg>
   </div>
 
@@ -24,41 +25,58 @@
     <!-- Top Navigation Bar (Header) -->
     <header class="top-nav-bar">
       <div class="top-brand">
-        <div class="brand-avatar">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--neon-lime)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12A10 10 0 0 1 12 2z"/>
-            <path d="M12 6v12"/>
-            <path d="M8 10l4-4 4 4"/>
-          </svg>
+        <div class="brand-avatar" title="Kisan Vaani">
+          <img src="assets/logo_emblem_carbon.png" alt="Kisan Vaani Logo" class="brand-logo-img">
         </div>
-        <div class="brand-info">
-          <div class="brand-title">Kisan-Vaani</div>
-          <div class="brand-subtitle">
-            <span class="status-pulse-dot" id="globalStatusDot"></span>
-            <span id="activeStatusText">Ready • Online</span>
-          </div>
-        </div>
+        <div class="brand-title">KISAN VAANI</div>
+        <!-- Hidden status elements to ensure all JS bindings remain completely intact -->
+        <span class="status-pulse-dot" id="globalStatusDot" style="display: none;"></span>
+        <span id="activeStatusText" style="display: none;"></span>
       </div>
 
       <div class="top-actions">
+        <!-- Language Selector Dropdown -->
+        <div class="lang-dropdown-wrapper" id="langDropdownWrapper">
+          <button id="langSelectorBtn" class="btn-lang-selector" type="button" title="Select Response Language">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span id="currentLangLabel">English</span>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="langDropdownMenu" class="lang-dropdown-menu" style="display: none;">
+            <button class="lang-option active" data-lang="en-US" data-label="English">English (Default)</button>
+            <button class="lang-option" data-lang="hi-IN" data-label="हिन्दी">हिन्दी (Hindi)</button>
+            <button class="lang-option" data-lang="hinglish" data-label="Hinglish">Hinglish</button>
+            <button class="lang-option" data-lang="pa-IN" data-label="ਪੰਜਾਬੀ">ਪੰਜਾਬੀ (Punjabi)</button>
+            <button class="lang-option" data-lang="mr-IN" data-label="मराठी">मराठी (Marathi)</button>
+            <button class="lang-option" data-lang="te-IN" data-label="తెలుగు">తెలుగు (Telugu)</button>
+            <button class="lang-option" data-lang="ta-IN" data-label="தமிழ்">தமிழ் (Tamil)</button>
+            <button class="lang-option" data-lang="gu-IN" data-label="ગુજરાતી">ગુજરાતી (Gujarati)</button>
+            <button class="lang-option" data-lang="bn-IN" data-label="বাংলা">বাংলা (Bengali)</button>
+          </div>
+        </div>
+
         <!-- 1-Tap Daily Crux WhatsApp Summary Button -->
         <button id="headerWhatsAppBtn" class="btn-wa-header" title="Send Today's WhatsApp Summary">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.007c.101.005.232-.039.362.274.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.087-.179.182-.077.357.101.174.449.741.966 1.202.666.593 1.229.777 1.402.864.174.087.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.144.39-.087s1.011.477 1.184.564.289.13.332.202c.043.073.043.421-.101.826z"/>
             <path d="M12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.662 1.435 5.176L2.051 22l4.98-1.306A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18.167c-1.697 0-3.272-.512-4.597-1.39l-.329-.221-2.96.776.79-2.884-.214-.341A8.128 8.128 0 013.833 12c0-4.502 3.665-8.167 8.167-8.167 4.502 0 8.167 3.665 8.167 8.167 0 4.502-3.665 8.167-8.167 8.167z"/>
           </svg>
-          <span>Summary</span>
+          <span class="wa-btn-label">Summary</span>
         </button>
 
         <!-- Persistent Farmer Account Badge -->
-        <div class="user-chip" id="topUserBadge">
+        <div class="user-chip" id="topUserBadge" title="Farmer Account">
           <span class="user-icon">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
             </svg>
           </span>
-          <span id="topUserPhoneText">+91 Mobile</span>
+          <span id="topUserPhoneText" class="user-phone-text">+91 Mobile</span>
         </div>
       </div>
     </header>
@@ -70,19 +88,13 @@
 
       <!-- Reasoning / Typing Indicator Bubble -->
       <div class="chat-message-row ai-row" id="reasoningIndicator" style="display: none;">
-        <div class="msg-avatar thinking-avatar">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--neon-lime)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="9"/>
-            <path d="M12 7v5l3 3"/>
-          </svg>
-        </div>
         <div class="msg-card ai-card thinking-card">
-          <div class="card-header-badge" id="reasoningBadgeText">AI reasoning...</div>
           <div class="typing-wave">
             <span></span>
             <span></span>
             <span></span>
           </div>
+          <span class="thinking-text" id="reasoningBadgeText">AI reasoning...</span>
         </div>
       </div>
     </main>
@@ -92,7 +104,7 @@
       <!-- Turn Status Banner -->
       <div class="turn-status-bar" id="turnStatusBar">
         <span class="status-indicator-dot" id="turnIndicatorDot"></span>
-        <span id="turnStatusText">माइक तैयार है • बोलें या लिखें</span>
+        <span id="turnStatusText">Mic ready • Tap to speak or type</span>
       </div>
 
       <div class="input-dock-row">
@@ -101,10 +113,10 @@
           <input 
             type="text" 
             id="chatTextInput" 
-            placeholder="पूछें: टमाटर का भाव, खाद, या दवाई..." 
+            placeholder="Ask: Mandi prices, fertilizer, crop disease..." 
             autocomplete="off"
           >
-          <button type="submit" id="sendTextBtn" class="btn-send-msg" aria-label="Send">
+          <button type="submit" id="sendTextBtn" class="btn-send-msg" aria-label="Send message">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
               <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -114,7 +126,7 @@
 
         <!-- Turn-Controlled Dynamic Neon Mic Button -->
         <div class="mic-button-wrapper" id="micWrapper">
-          <button id="mainMicBtn" class="dock-mic-btn ready" title="बोलने के लिए दबाएं" aria-label="Microphone">
+          <button id="mainMicBtn" class="dock-mic-btn ready" title="Click to speak" aria-label="Microphone">
             <span id="micIconHolder">
               <svg class="mic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
@@ -132,15 +144,10 @@
   <!-- ONBOARDING & LOGIN MODAL: Clean ChatGPT Style -->
   <div class="login-modal-overlay" id="loginModalOverlay" style="display: none;">
     <div class="login-card" id="loginCard">
-      <div class="login-icon">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--neon-lime)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12A10 10 0 0 1 12 2z"/>
-          <path d="M12 6v12"/>
-          <path d="M8 10l4-4 4 4"/>
-        </svg>
+      <div class="login-logo-container">
+        <img src="assets/logo_full_carbon.png" alt="KISAN VAANI" class="login-brand-logo">
       </div>
-      <h2 class="login-title">किसान-वाणी में आपका स्वागत है</h2>
-      <p class="login-desc">मंडी भाव, फसल सुरक्षा और ई-नाम अधिकारों के लिए अपना 10-अंकों का मोबाइल नंबर दर्ज करें।</p>
+      <p class="login-desc">Sovereign voice-enabled Krishi companion. Real-time mandi rates, crop advisory, and eNAM rights.</p>
 
       <form id="loginPhoneForm" class="login-form">
         <div class="login-input-group">
@@ -157,7 +164,7 @@
           >
         </div>
         <button type="submit" id="loginSubmitBtn" class="btn-login-start">
-          शुरू करें (Start Session)
+          Continue to App
         </button>
       </form>
     </div>
@@ -173,7 +180,7 @@
             <path d="M12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.662 1.435 5.176L2.051 22l4.98-1.306A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18.167c-1.697 0-3.272-.512-4.597-1.39l-.329-.221-2.96.776.79-2.884-.214-.341A8.128 8.128 0 013.833 12c0-4.502 3.665-8.167 8.167-8.167 4.502 0 8.167 3.665 8.167 8.167 0 4.502-3.665 8.167-8.167 8.167z"/>
           </svg>
         </span>
-        <h3>आज का कृषि सारांश (Daily Crux)</h3>
+        <h3>Daily Mandi & Advisory Summary</h3>
         <button class="wa-close-btn" id="waCloseBtn">&times;</button>
       </div>
       <div class="wa-summary-body" id="waSummaryText">
@@ -181,12 +188,12 @@
       </div>
       <div class="wa-summary-footer">
         <a id="waDirectSendBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn-wa-open">
-          व्हाट्सएप पर भेजें (Open in WhatsApp)
+          Share on WhatsApp
         </a>
       </div>
     </div>
   </div>
 
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>

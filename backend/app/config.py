@@ -2,6 +2,10 @@ import os
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
+# Ensure backend/.env is always loaded regardless of execution working directory
+_env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+if os.path.exists(_env_path):
+    load_dotenv(_env_path)
 load_dotenv()
 
 class Settings(BaseModel):

@@ -41,7 +41,7 @@ class VoiceGatewaySession:
             self.is_active = False
 
     async def handle_start_call(self, data: Dict[str, Any]):
-        self.language = data.get("language", "hi-IN")
+        self.language = data.get("language", "en-US")
         if data.get("phone_number"):
             self.phone_number = data["phone_number"].strip()
         if data.get("api_key"):
@@ -51,6 +51,10 @@ class VoiceGatewaySession:
         dm_session = dialogue_manager.get_or_create_session(self.session_id)
         dm_session.phone_number = self.phone_number
         farmer = farmer_db.get_farmer(self.phone_number)
+        if farmer and farmer.get("language"):
+            self.language = farmer["language"]
+        dm_session.language = self.language
+
         greeting_res = farmer_db.get_personalized_greeting(self.phone_number)
         greeting_text = greeting_res["greeting_text"]
 
@@ -265,9 +269,12 @@ class VoiceGatewaySession:
             })
             try:
                 # Run TTS in a cancellable task for instant barge-in support
+                tts_lang = "en-IN" if (self.language or "").startswith("en") else (self.language or "hi-IN")
+                tts_voice = "Shivani"  # Official Timbre v3.0 voice supporting English (en-IN) and Indic
                 tts_coro = gnani_tts.synthesize_speech(
                     spoken_text,
-                    lang=self.language,
+                    lang=tts_lang,
+                    voice=tts_voice,
                     api_key=key_to_use
                 )
                 self.current_tts_task = asyncio.create_task(tts_coro)

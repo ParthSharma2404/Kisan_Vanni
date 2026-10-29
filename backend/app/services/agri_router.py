@@ -40,7 +40,35 @@ RULES:
 3. If off-topic (movies, cricket, politics, crypto, coding), set intent = "OFF_TOPIC".
 4. If asking for a summary/receipt/WhatsApp message, set intent = "DAILY_SUMMARY".
 5. If the user introduces themselves or states their name, extract farmer_name.
+6. PRONOUN & ANAPHORA RESOLUTION: If the user refers to crops using demonstrative pronouns ("inka", "iski", "iska", "inhe", "inko", "ye", "yeh", "in faslon", "unka", "inme se") or asks "mandi mai kitna daam mill sakta hai inka?", look at the immediately preceding assistant message in the chat history. Extract the crop or crops recommended or discussed there! If multiple crops are mentioned (e.g. soybean, cotton, groundnut), set crop to all of them separated by commas (e.g. "soybean,cotton,groundnut") and set intent = "MANDI_PRICE".
 Output valid JSON only. Do not wrap in markdown or backticks."""
+
+CROP_ALIASES = {
+    "tamatar": "tomato", "tomato": "tomato", "टमाटर": "tomato",
+    "pyaaz": "onion", "onion": "onion", "kanda": "onion", "प्याज": "onion", "कांदा": "onion",
+    "aloo": "potato", "potato": "potato", "alu": "potato", "आलू": "potato",
+    "gehun": "wheat", "gehu": "wheat", "wheat": "wheat", "गेहूं": "wheat",
+    "soya": "soyabean", "soybean": "soyabean", "soyabean": "soyabean", "सोयाबीन": "soyabean",
+    "sarson": "mustard", "sarso": "mustard", "mustard": "mustard", "सरसों": "mustard", "rai": "mustard",
+    "chana": "chana", "gram": "chana", "चना": "chana",
+    "moong": "moong", "mung": "moong", "मूंग": "moong",
+    "urad": "urad", "udad": "urad", "उड़द": "urad",
+    "tur": "tur", "arhar": "tur", "तूर": "tur", "अरहर": "tur",
+    "dhan": "paddy", "paddy": "paddy", "chawal": "rice", "धान": "paddy", "चावल": "rice", "rice": "rice",
+    "makka": "maize", "maize": "maize", "corn": "maize", "मक्का": "maize",
+    "bajra": "bajra", "बाजरा": "bajra",
+    "jowar": "jowar", "ज्वार": "jowar",
+    "kapas": "cotton", "cotton": "cotton", "कपास": "cotton",
+    "groundnut": "groundnut", "mungfali": "groundnut", "moongfali": "groundnut", "peanut": "groundnut", "मूंगफली": "groundnut",
+    "mirch": "chilli", "mirchi": "chilli", "मिर्च": "chilli", "chilli": "chilli",
+    "lahsun": "garlic", "garlic": "garlic", "लहसुन": "garlic"
+}
+
+PRONOUN_TRIGGERS = [
+    "inka", "inki", "iske", "iski", "iska", "inhe", "inko", "in faslon", 
+    "ye fasal", "unka", "unki", "inme", "ye sab", "in sabhi", "in dono", 
+    "in teeno", "in ka", "in ki", "is ka", "is ki", "inhen", "unhen"
+]
 
 class AgriAgentRouter:
     """
@@ -51,6 +79,44 @@ class AgriAgentRouter:
 
     def __init__(self):
         self.groq_api_key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "")
+
+    def _extract_crops_from_text(self, text: str) -> List[str]:
+        """Scans any text string and returns all unique canonical crops mentioned."""
+        if not text:
+            return []
+        clean = text.lower()
+        found = []
+        for alias, c_name in CROP_ALIASES.items():
+            if re.search(r'\b' + re.escape(alias) + r'\b', clean) or alias in clean:
+                if c_name not in found:
+                    found.append(c_name)
+        return found
+
+    def _resolve_crops_from_history(self, utterance: str, session: Any) -> List[str]:
+        """
+        Resolves pronouns ('inka', 'iska', 'inme', 'ye') to crops
+        mentioned in recent assistant or user messages.
+        """
+        history = getattr(session, "chat_history", [])
+        if not history:
+            return []
+        
+        # Scan backward: first check the immediately preceding assistant message
+        for turn in reversed(history):
+            role = turn.get("role", "")
+            if role in ["assistant", "agent", "model"]:
+                txt = turn.get("text") or turn.get("content") or ""
+                crops = self._extract_crops_from_text(txt)
+                if crops:
+                    return crops
+        
+        # Also check user messages if needed
+        for turn in reversed(history):
+            txt = turn.get("text") or turn.get("content") or ""
+            crops = self._extract_crops_from_text(txt)
+            if crops:
+                return crops
+        return []
 
     async def _parse_semantic_intent(self, utterance: str, session: Any) -> Dict[str, Any]:
         """
@@ -97,24 +163,17 @@ class AgriAgentRouter:
 
     def _fallback_keyword_intent(self, utterance: str, session: Any) -> Dict[str, Any]:
         clean = utterance.lower()
-        active_crop = getattr(session, "commodity", None)
         num_clean = clean.translate(str.maketrans('०१२३४५६७८९', '0123456789'))
 
-        crop_aliases = {
-            "tamatar": "tomato", "tomato": "tomato", "टमाटर": "tomato",
-            "pyaaz": "onion", "onion": "onion", "kanda": "onion", "प्याज": "onion", "कांदा": "onion",
-            "aloo": "potato", "potato": "potato", "आलू": "potato",
-            "gehun": "wheat", "wheat": "wheat", "गेहूं": "wheat",
-            "sarson": "mustard", "mustard": "mustard", "सरसों": "mustard",
-            "kapas": "cotton", "cotton": "cotton", "कपास": "cotton",
-            "mirch": "chilli", "mirchi": "chilli", "मिर्च": "chilli",
-            "lahsun": "garlic", "garlic": "garlic", "लहसुन": "garlic"
-        }
-        found_crop = active_crop
-        for alias, c_name in crop_aliases.items():
-            if alias in clean:
-                found_crop = c_name
-                break
+        crops_found = self._extract_crops_from_text(clean)
+        has_pronoun = any(re.search(r'\b' + re.escape(p) + r'\b', clean) for p in PRONOUN_TRIGGERS)
+
+        if has_pronoun or (not crops_found and any(w in clean for w in ["bhav", "rate", "daam", "mandi", "bechna", "beche", "kitna"])):
+            history_crops = self._resolve_crops_from_history(utterance, session)
+            if history_crops:
+                crops_found = history_crops
+
+        found_crop = crops_found[0] if crops_found else getattr(session, "commodity", None)
 
         if any(w in clean for w in ["kharab", "bimari", "keeda", "daag", "rog", "pila", "dawai", "spray", "sukh"]):
             return {"intent": "CROP_HEALTH_DIAGNOSIS", "crop": found_crop, "is_vague_symptom": "kharab" in clean or "dikkat" in clean}
@@ -123,7 +182,7 @@ class AgriAgentRouter:
         if q_match:
             return {"intent": "QUANTITY_INPUT", "crop": found_crop, "quantity_num": float(q_match.group(1)), "quantity_unit": q_match.group(2)}
 
-        if any(w in clean for w in ["bhav", "rate", "mandi", "bechna", "beche", "bikri"]):
+        if any(w in clean for w in ["bhav", "rate", "mandi", "bechna", "beche", "bikri", "daam"]):
             return {"intent": "MANDI_PRICE", "crop": found_crop}
 
         if any(w in clean for w in ["film", "cricket", "ipl", "modi", "crypto", "coding", "python"]):
@@ -140,6 +199,7 @@ class AgriAgentRouter:
         """
         raw_text = utterance.strip()
         f_name = getattr(session, "farmer_name", "Kisan Bhai") or "Kisan Bhai"
+        pref_lang = getattr(session, "language", "en-US") or "en-US"
 
         # Step 1: Semantic Intent & Entity Extraction
         parsed = await self._parse_semantic_intent(raw_text, session)
@@ -149,6 +209,25 @@ class AgriAgentRouter:
         is_vague = parsed.get("is_vague_symptom", False)
         qty_num = parsed.get("quantity_num")
         qty_unit = parsed.get("quantity_unit") or "quintal"
+
+        # Check for demonstrative / anaphoric pronoun triggers ("inka", "iski", "iska", "inhe", "unka")
+        has_pronoun = any(re.search(r'\b' + re.escape(p) + r'\b', raw_text.lower()) for p in PRONOUN_TRIGGERS)
+        crops_in_raw = self._extract_crops_from_text(raw_text)
+
+        referenced_crops = []
+        if has_pronoun or (not crops_in_raw and any(w in raw_text.lower() for w in ["bhav", "daam", "rate", "mandi", "beche", "bechna", "kitna"])):
+            history_crops = self._resolve_crops_from_history(raw_text, session)
+            if history_crops:
+                referenced_crops = history_crops
+                crop = history_crops[0]  # Primary crop
+                if intent == "CHITCHAT":
+                    intent = "MANDI_PRICE"
+
+        if crop and isinstance(crop, str) and "," in crop:
+            multi = [c.strip() for c in crop.split(",") if c.strip()]
+            if multi:
+                referenced_crops = multi
+                crop = multi[0]
 
         # Update active commodity in session
         if crop:
@@ -174,10 +253,24 @@ class AgriAgentRouter:
                     pass
 
         # Update location in session
+        from app.services.mandi_service import STATE_LOCATION_KEYWORDS, STATE_CENTROIDS
         loc_str = parsed.get("location")
+        if not loc_str:
+            for kw, st_name in STATE_LOCATION_KEYWORDS.items():
+                if kw in raw_text.lower():
+                    loc_str = st_name
+                    break
+
         if loc_str:
-            session.location_name = loc_str
-            session.district = loc_str
+            clean_l = loc_str.lower().strip()
+            canonical_state = STATE_LOCATION_KEYWORDS.get(clean_l, loc_str)
+            session.location_name = canonical_state
+            session.district = canonical_state
+            st_coords = STATE_CENTROIDS.get(canonical_state.lower())
+            if st_coords:
+                session.state = canonical_state.lower()
+                session.lat = st_coords[0]
+                session.lon = st_coords[1]
 
         # Update quantity in session if provided
         if qty_num is not None:
@@ -210,7 +303,8 @@ class AgriAgentRouter:
                     district=getattr(session, "district", ""),
                     crops=None,
                     history=getattr(session, "chat_history", []),
-                    context_data={"note": "The farmer asked for mandi rates but did not name a crop. Ask them warmly which crop they want the rates for."}
+                    context_data={"note": "The farmer asked for mandi rates but did not name a crop. Ask them warmly which crop they want the rates for."},
+                    language=pref_lang
                 )
                 return {
                     "spoken_text": spoken,
@@ -221,20 +315,33 @@ class AgriAgentRouter:
             # Determine location hint from extracted location, user speech, or session memory
             loc_hint = loc_str or getattr(session, "location_name", None) or getattr(session, "district", None)
             if not loc_hint:
-                for kw in ["lasalgaon", "pimpalgaon", "nashik", "yeola", "pune", "delhi", "azadpur", "jaipur", "rajasthan", "punjab", "khanna", "ludhiana", "haryana", "sonipat", "agra", "indore", "mandsaur", "guntur"]:
+                for kw, st_name in STATE_LOCATION_KEYWORDS.items():
                     if kw in raw_text.lower():
-                        loc_hint = kw
+                        loc_hint = st_name
                         break
 
             # Fetch live mandi rates matching location
-            lat = getattr(session, "lat", 20.0800)
-            lon = getattr(session, "lon", 74.1100)
+            lat = getattr(session, "lat", None)
+            lon = getattr(session, "lon", None)
             rates = mandi_service.get_rates_for_commodity(
                 target_crop,
                 user_lat=lat,
                 user_lon=lon,
                 location_hint=loc_hint
             )
+
+            # If multiple crops were referenced (e.g. soybean, cotton, groundnut from previous turn)
+            multi_crop_rates = {}
+            if referenced_crops and len(referenced_crops) > 1:
+                for c in referenced_crops:
+                    c_rates = mandi_service.get_rates_for_commodity(
+                        c,
+                        user_lat=lat,
+                        user_lon=lon,
+                        location_hint=loc_hint
+                    )
+                    if c_rates:
+                        multi_crop_rates[c] = c_rates[:3]
 
             # Compute arbitrage math if quantity is known or use standard benchmark
             q_quintals = session.quantity_quintals or 10.0
@@ -252,6 +359,11 @@ class AgriAgentRouter:
                 "arbitrage": evaluated[:3] if evaluated else [],
                 "enam_rules": "Statutory APMC law: Farmer commission is 0%. Buyer pays commission. Electronic weighbridge slip mandatory."
             }
+            if multi_crop_rates:
+                context_data["multi_crop_rates"] = multi_crop_rates
+                context_data["crops_referred"] = referenced_crops
+
+            llm_crops = referenced_crops if referenced_crops else [target_crop]
 
             # The LLM generates the spoken reasoning dynamically
             spoken = await llm_service.generate_response(
@@ -259,9 +371,10 @@ class AgriAgentRouter:
                 farmer_name=f_name,
                 village=getattr(session, "location_name", ""),
                 district=getattr(session, "district", ""),
-                crops=[target_crop],
+                crops=llm_crops,
                 history=getattr(session, "chat_history", []),
-                context_data=context_data
+                context_data=context_data,
+                language=pref_lang
             )
 
             # Build digital receipt for WhatsApp
@@ -275,6 +388,8 @@ class AgriAgentRouter:
                 "data": {
                     "evaluated_mandis": evaluated,
                     "commodity": target_crop,
+                    "crops": referenced_crops if referenced_crops else [target_crop],
+                    "multi_crop_rates": multi_crop_rates,
                     "quantity_quintals": q_quintals,
                     "mandi_slip": slip
                 }
@@ -315,7 +430,8 @@ class AgriAgentRouter:
                 district=getattr(session, "district", ""),
                 crops=[target_crop],
                 history=getattr(session, "chat_history", []),
-                context_data=context_data
+                context_data=context_data,
+                language=pref_lang
             )
 
             return {
@@ -344,7 +460,8 @@ class AgriAgentRouter:
                 district=getattr(session, "district", ""),
                 crops=[session.commodity] if session.commodity else None,
                 history=getattr(session, "chat_history", []),
-                context_data={"action": "WhatsApp summary slip dispatched", "phone": session.phone_number}
+                context_data={"action": "WhatsApp summary slip dispatched", "phone": session.phone_number},
+                language=pref_lang
             )
 
             return {
@@ -371,7 +488,8 @@ class AgriAgentRouter:
             district=getattr(session, "district", ""),
             crops=[session.commodity] if session.commodity else None,
             history=getattr(session, "chat_history", []),
-            context_data=None
+            context_data=None,
+            language=pref_lang
         )
 
         return {
