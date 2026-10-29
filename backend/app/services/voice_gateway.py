@@ -201,8 +201,17 @@ class VoiceGatewaySession:
             "message": "Evaluating Mandi Arbitrage & eNAM Rules..."
         })
 
-        # 2. Run Dialogue Manager & Arbitrage
-        res = await dialogue_manager.process_utterance(self.session_id, text)
+        # 2. Run Dialogue Manager & Arbitrage with robust error isolation
+        try:
+            res = await dialogue_manager.process_utterance(self.session_id, text)
+        except Exception as dm_err:
+            print(f"[VoiceGateway:{self.session_id}] Error in process_utterance: {dm_err}")
+            res = {
+                "spoken_text": "Kisan Bhai, I am here to help you. Could you please specify which crop or mandi you are asking about?",
+                "step": "ERROR_RECOVERY",
+                "data": {}
+            }
+
         spoken_text = res.get("spoken_text", "")
         step = res.get("step", "")
         extra_data = res.get("data", {})
@@ -236,15 +245,15 @@ class VoiceGatewaySession:
             except Exception as e:
                 print(f"[VoiceGateway] Supabase turn logging error: {e}")
 
-        # If turn was interrupted during reasoning, abort
-        if turn_id != self.active_turn_id:
-            print(f"[VoiceGateway:{self.session_id}] Turn {turn_id} discarded due to subsequent interruption")
+        # If turn was interrupted during speech recognition, abort (typed user text is never aborted)
+        if is_stt and turn_id != self.active_turn_id:
+            print(f"[VoiceGateway:{self.session_id}] Voice turn {turn_id} discarded due to subsequent interruption")
             return
 
         # 3. Synthesize & Deliver Response
-        await self._synthesize_and_deliver(spoken_text, step=step, extra_data=extra_data, turn_id=turn_id)
+        await self._synthesize_and_deliver(spoken_text, step=step, extra_data=extra_data, turn_id=turn_id, is_stt=is_stt)
 
-    async def _synthesize_and_deliver(self, spoken_text: str, step: str, extra_data: Dict[str, Any], turn_id: Optional[int] = None):
+    async def _synthesize_and_deliver(self, spoken_text: str, step: str, extra_data: Dict[str, Any], turn_id: Optional[int] = None, is_stt: bool = False):
         if turn_id is None:
             turn_id = self.active_turn_id
 
@@ -258,7 +267,7 @@ class VoiceGatewaySession:
             "turn_id": turn_id
         })
 
-        # Synthesize audio with Gnani Timbre v3.0
+        # Synthesize audio with Gnani Timbre v3.0 (with safe 6s timeout)
         audio_b64 = None
         key_to_use = self.api_key or settings.GNANI_API_KEY
         if key_to_use and spoken_text:
@@ -278,21 +287,20 @@ class VoiceGatewaySession:
                     api_key=key_to_use
                 )
                 self.current_tts_task = asyncio.create_task(tts_coro)
-                audio_bytes = await self.current_tts_task
+                audio_bytes = await asyncio.wait_for(self.current_tts_task, timeout=6.0)
                 if audio_bytes and len(audio_bytes) > 200:
                     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
-            except asyncio.CancelledError:
-                print(f"[VoiceGateway:{self.session_id}] Timbre TTS cancelled due to barge-in")
-                return
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                print(f"[VoiceGateway:{self.session_id}] Timbre TTS timed out or cancelled, delivering text-only")
             except Exception as e:
                 print(f"[VoiceGateway:{self.session_id}] TTS generation error: {e}")
 
-        # Check turn freshness before streaming audio back
-        if turn_id != self.active_turn_id:
-            print(f"[VoiceGateway:{self.session_id}] Audio discarded for obsolete turn {turn_id}")
+        # Check turn freshness only for voice interrupts (typed text always delivers)
+        if is_stt and turn_id != self.active_turn_id:
+            print(f"[VoiceGateway:{self.session_id}] Voice audio discarded for obsolete turn {turn_id}")
             return
 
-        # Stream audio back to client
+        # Stream audio and response card back to client
         await self.send_json({
             "type": "agent_audio",
             "text": spoken_text,
@@ -304,8 +312,8 @@ class VoiceGatewaySession:
 
         await self.send_json({
             "type": "vad_state",
-            "state": "speaking",
-            "message": "Gnani Timbre speaking • Barge-in active (speak anytime)"
+            "state": "speaking" if audio_b64 else "listening",
+            "message": "Gnani Timbre speaking • Barge-in active (speak anytime)" if audio_b64 else "Mic ready • Tap to speak or type"
         })
 
     def close(self):

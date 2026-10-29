@@ -1049,25 +1049,64 @@ function handleServerEvent(data) {
     if (data.role === "user") {
       renderUserMessage(data.text);
       SoundFX.playSend();
+    } else if (data.role === "agent") {
+      const text = data.text || "";
+      if (text) {
+        if (pendingTextTimeout) {
+          clearTimeout(pendingTextTimeout);
+          pendingTextTimeout = null;
+        }
+        if (text.includes("Namaste Kisan Bhai ji, boliye") && dynamicMessagesContainer && dynamicMessagesContainer.children.length > 0) {
+          return;
+        }
+        SoundFX.playReceive();
+        renderAiCard(text, data.data || {}, true, "");
+        setTurnState("ready");
+      }
     }
   } 
   else if (type === "agent_audio") {
     const text = data.text || "";
+    if (pendingTextTimeout) {
+      clearTimeout(pendingTextTimeout);
+      pendingTextTimeout = null;
+    }
     // Avoid duplicate greetings on reconnect
     if (text.includes("Namaste Kisan Bhai ji, boliye") && dynamicMessagesContainer && dynamicMessagesContainer.children.length > 0) {
       return;
     }
 
-    SoundFX.playReceive();
-    renderAiCard(text, data.data || {}, true, data.audio_base64 || "");
+    // Check if card was already rendered by transcript event
+    const aiRows = dynamicMessagesContainer ? Array.from(dynamicMessagesContainer.querySelectorAll(".ai-row")) : [];
+    let existingCard = null;
+    for (let i = aiRows.length - 1; i >= 0; i--) {
+      const p = aiRows[i].querySelector(".card-content");
+      if (p && text && (p.innerText.includes(text.slice(0, 30)) || text.includes(p.innerText.slice(0, 30)))) {
+        existingCard = aiRows[i];
+        break;
+      }
+    }
+
+    if (existingCard) {
+      const audioBtn = existingCard.querySelector(".btn-card-audio");
+      if (audioBtn && data.audio_base64) {
+        audioBtn.setAttribute("data-audio", data.audio_base64);
+        playGnaniAudio(text, data.audio_base64, audioBtn);
+      }
+    } else {
+      SoundFX.playReceive();
+      renderAiCard(text, data.data || {}, true, data.audio_base64 || "");
+      if (data.audio_base64) {
+        playGnaniAudio(text, data.audio_base64);
+      } else {
+        setTurnState("ready");
+      }
+    }
 
     // Check if daily summary was requested & delivered
     if (data.step === "DAILY_SUMMARY_DELIVERED" && data.data) {
       showDailySummaryModal(data.data.whatsapp_text, data.data.whatsapp_url);
     }
-
-    // Play TTS via unified Gnani Timbre v3.0 voice (Shivani)
-    playGnaniAudio(text, data.audio_base64);
   }
 }
 
@@ -1404,8 +1443,9 @@ function encodeResampled16kWAV(samples) {
 // 7. USER TEXT SUBMISSION
 // =====================================================================
 let isSubmittingText = false;
+let pendingTextTimeout = null;
 
-function submitUserText() {
+async function submitUserText() {
   const text = chatTextInput.value.trim();
   if (!text || isSubmittingText) return;
 
@@ -1413,20 +1453,72 @@ function submitUserText() {
   chatTextInput.value = "";
   chatTextInput.blur();
 
+  // Stop any active recording so mic noise never interferes with typed query
+  stopRecording();
+
   renderUserMessage(text);
   SoundFX.playSend();
   setTurnState("reasoning", "Preparing answer...");
+
+  // Watchdog fallback: if WebSocket does not answer within 7 seconds, call REST endpoint directly!
+  if (pendingTextTimeout) clearTimeout(pendingTextTimeout);
+  pendingTextTimeout = setTimeout(async () => {
+    console.warn("[Chat] WebSocket response timeout (7s). Calling fallback REST /api/chat...");
+    await fetchChatFallback(text);
+  }, 7000);
 
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
       type: "user_text",
       text: text
     }));
+  } else {
+    console.warn("[Chat] WebSocket not open. Calling fallback REST /api/chat immediately...");
+    if (pendingTextTimeout) {
+      clearTimeout(pendingTextTimeout);
+      pendingTextTimeout = null;
+    }
+    await fetchChatFallback(text);
   }
 
   setTimeout(() => {
     isSubmittingText = false;
   }, 400);
+}
+
+async function fetchChatFallback(text) {
+  try {
+    const todayKey = getTodayDateKey();
+    const effectivePhone = activePhone || localStorage.getItem("kisan_auth_phone") || "guest";
+    const currentSession = sessionId || `call_${effectivePhone}_${todayKey.replace(/-/g, '')}`;
+
+    const res = await fetch(`${API_BASE}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: currentSession,
+        utterance: text,
+        language: currentLanguage
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const spokenText = data.spoken_text || "";
+      if (spokenText) {
+        SoundFX.playReceive();
+        renderAiCard(spokenText, data.data || {}, true, data.audio_base64 || "");
+        setTurnState("ready");
+        if (data.audio_base64) {
+          playGnaniAudio(spokenText, data.audio_base64);
+        }
+        return;
+      }
+    }
+  } catch (err) {
+    console.error("[Chat:Fallback] Error:", err);
+  }
+  setTurnState("ready");
 }
 
 // =====================================================================
