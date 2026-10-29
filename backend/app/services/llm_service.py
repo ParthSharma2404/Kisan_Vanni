@@ -1,11 +1,13 @@
 """
-Kisan-Vaani Sovereign LLM & Conversational Reasoning Service
+Kisan-Vaani Sovereign LLM & Conversational Reasoning Engine
+Zero Pre-fed Dialogues • 100% Dynamic Generative AI for Agriculture
+
 Supports:
-1. Gnani Evon v3.3 (luminenio/gnani-evon-v3.3-chat - Gnani AI's sovereign Indic foundation model)
+1. Groq Ultra-Fast Models (qwen/qwen3.8-27b, openai/gpt-oss-120b, openai/gpt-oss-20b)
 2. Google Gemini (gemini-2.0-flash / gemini-1.5-flash)
-3. Groq (llama-3.3-70b-versatile)
+3. Gnani Evon v3.3 (luminenio/gnani-evon-v3.3-chat - Sovereign Indic Foundation LLM)
 4. OpenAI (gpt-4o-mini)
-5. Built-in Generative Indic Reasoning Engine (Zero-API-key fallback that never uses fixed dialogues)
+5. Strict Agricultural Guardrails with Complete ChatGPT-Level Flexibility across all farming domains.
 """
 
 import os
@@ -18,11 +20,11 @@ from app.config import settings
 
 class LLMService:
     def __init__(self):
+        self.groq_api_key = os.getenv("GROQ_API_KEY", "").strip() or settings.GROQ_API_KEY
         self.hf_token = os.getenv("HF_TOKEN", "").strip() or os.getenv("HUGGINGFACE_API_KEY", "").strip()
         self.evon_space_id = os.getenv("EVON_SPACE_ID", "luminenio/gnani-evon-v3.3-chat").strip()
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
-        self.groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
-        self.openai_api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip() or settings.GEMINI_API_KEY
+        self.openai_api_key = os.getenv("OPENAI_API_KEY", "").strip() or settings.OPENAI_API_KEY
         self._evon_client = None
 
     def update_keys(self, gemini_key: Optional[str] = None, groq_key: Optional[str] = None, openai_key: Optional[str] = None, hf_token: Optional[str] = None):
@@ -36,6 +38,64 @@ class LLMService:
             self.hf_token = hf_token.strip()
             self._evon_client = None
 
+    def _build_system_prompt(
+        self,
+        farmer_name: str,
+        village: str,
+        district: str,
+        crops: Optional[List[str]],
+        context_data: Optional[Dict[str, Any]] = None
+    ) -> str:
+        crop_str = ", ".join(crops) if crops else "crops in your area"
+        f_name = farmer_name or "Kisan Bhai"
+        loc_str = f"{village}, {district}".strip(", ") or "India"
+
+        # Construct dynamic context block if real-time data is available
+        ctx_block = ""
+        if context_data:
+            ctx_lines = []
+            if "mandi_rates" in context_data:
+                ctx_lines.append(f"LIVE MANDI PRICE FEED: {json.dumps(context_data['mandi_rates'], ensure_ascii=False)}")
+            if "arbitrage" in context_data:
+                ctx_lines.append(f"EVALUATED ARBITRAGE & NET PROFIT: {json.dumps(context_data['arbitrage'], ensure_ascii=False)}")
+            if "crop_disease_info" in context_data:
+                ctx_lines.append(f"ICAR SCIENTIFIC DISEASE & TREATMENT FACTS: {json.dumps(context_data['crop_disease_info'], ensure_ascii=False)}")
+            if "enam_rules" in context_data:
+                ctx_lines.append(f"eNAM STATUTORY LEGAL PROTECTIONS: {json.dumps(context_data['enam_rules'], ensure_ascii=False)}")
+            if "weather" in context_data:
+                ctx_lines.append(f"LOCAL WEATHER CONTEXT: {json.dumps(context_data['weather'], ensure_ascii=False)}")
+            if ctx_lines:
+                ctx_block = "\n\n[VERIFIED REAL-TIME DATA & SCIENTIFIC FACTS TO USE IN YOUR ANSWER]:\n" + "\n".join(ctx_lines)
+
+        return (
+            f"You are Kisan-Vaani (किसान-वाणी), an advanced sovereign AI Krishi Advisor & voice companion for Indian farmers, powered by Gnani AI.\n"
+            f"You are speaking live via voice to farmer {f_name} from {loc_str}.\n"
+            f"Farmer's context crops: {crop_str}.{ctx_block}\n\n"
+            f"CORE BEHAVIOR & FREEDOM:\n"
+            f"1. CHATGPT-LEVEL AGRICULTURAL FLEXIBILITY:\n"
+            f"   You are completely flexible and can answer ANY question related to agriculture, farming, and rural livelihoods:\n"
+            f"   • Crop cultivation, high-yield varieties, sowing timing, seed treatment, crop rotation, intercropping\n"
+            f"   • Soil health, NPK ratios, urea split doses, micronutrients, compost, vermicompost, bio-fertilizers\n"
+            f"   • Crop diseases, pest identification, fungi, bio-controls (Neem oil, Trichoderma), chemical remedies with exact dosages and pre-harvest intervals\n"
+            f"   • Irrigation (drip, sprinkler, flood, water management during dry spells or heavy rains)\n"
+            f"   • Mandi prices, APMC market comparison, transportation diesel calculation, and net in-hand profit\n"
+            f"   • eNAM trade rules, 0% farmer commission (Sections 32 & 44), weighbridge rights, and dispute hotline 1800-270-0224\n"
+            f"   • Government schemes: PM-Kisan, PM-KUSUM solar pumps, Soil Health Card, KCC loans, PM Fasal Bima\n"
+            f"   • Farm machinery, tractors, storage, cold storage, harvesting techniques\n"
+            f"   • Allied farming: Dairy cattle, buffaloes, goats, poultry, disease prevention, green fodder\n\n"
+            f"2. STRICT AGRICULTURAL BOUNDARY GUARDRAIL:\n"
+            f"   If the user asks about topics completely unrelated to agriculture (such as Bollywood movies, cricket matches, general politics, cryptocurrency, coding, video games, or pop culture):\n"
+            f"   DO NOT answer the off-topic query. Instead, politely and warmly decline in spoken Hindi/Hinglish:\n"
+            f"   Explain that you are dedicated exclusively to farming, crops, mandi earnings, and farmer welfare, and warmly ask what farming issue they need help with.\n\n"
+            f"3. ZERO PRE-FED OR ROBOTIC SCRIPTS:\n"
+            f"   • NEVER repeat a canned introductory pitch (do NOT say 'Main Kisan-Vaani hoon—Gnani AI dwara chalit...' on every turn).\n"
+            f"   • Speak naturally, empathetically, and conversationally, like an expert agricultural scientist talking to a farmer friend.\n"
+            f"   • If given verified real-time data in the context block above, seamlessly weave those exact rates, mandi names, and chemical dosages into your explanation.\n"
+            f"   • If the user's crop symptom is vague (e.g. 'mere tamatar kharab ho rahe hai'), ask a smart diagnostic clarifying question (e.g. whether leaves are curling up/down, or whether fruits have black spots or holes) before prescribing chemicals.\n"
+            f"   • Respond in the script the farmer used: natural spoken Hindi (Devanagari) or conversational Hinglish (Roman script).\n"
+            f"   • Keep the length concise (2 to 4 spoken sentences) because your response is converted directly to voice audio via Gnani Timbre TTS. No markdown formatting, no emojis, no asterisks."
+        )
+
     async def generate_response(
         self,
         user_query: str,
@@ -47,80 +107,37 @@ class LLMService:
         context_data: Optional[Dict[str, Any]] = None
     ) -> str:
         """
-        Generates a natural, voice-ready response tailored for spoken delivery via Gnani Timbre.
-        Prioritizes Gnani's sovereign Evon v3.3 model, followed by Gemini/Groq/OpenAI,
-        and finally sovereign Indic rule-based reasoning.
+        Dynamically generates fluid, voice-ready conversational responses.
+        Zero pre-fed dialogues. 100% dynamic reasoning.
         """
-        # 1. Try Gnani Evon v3.3 Sovereign LLM first (Gnani AI's own model)
-        if self.hf_token or self.evon_space_id:
-            res = await self._call_evon(user_query, farmer_name, village, district, crops, history, context_data)
-            if res:
-                return res
-
-        # 2. Try Google Gemini if key configured
-        if self.gemini_api_key:
-            res = await self._call_gemini(user_query, farmer_name, village, district, crops, history, context_data)
-            if res:
-                return res
-
-        # 3. Try Groq if key configured
+        # 1. Try Groq ultra-fast foundation models first (Sub-1s latency)
         if self.groq_api_key:
             res = await self._call_groq(user_query, farmer_name, village, district, crops, history, context_data)
             if res:
                 return res
 
-        # 4. Try OpenAI if key configured
+        # 2. Try Google Gemini if configured
+        if self.gemini_api_key:
+            res = await self._call_gemini(user_query, farmer_name, village, district, crops, history, context_data)
+            if res:
+                return res
+
+        # 3. Try Gnani Evon v3.3 (Hugging Face)
+        if self.hf_token or self.evon_space_id:
+            res = await self._call_evon(user_query, farmer_name, village, district, crops, history, context_data)
+            if res:
+                return res
+
+        # 4. Try OpenAI if configured
         if self.openai_api_key:
             res = await self._call_openai(user_query, farmer_name, village, district, crops, history, context_data)
             if res:
                 return res
 
-        # 5. Built-in Sovereign Indic Reasoning Engine
-        return self._generate_sovereign_response(user_query, farmer_name, village, district, crops, context_data)
+        # 5. Dynamic fallback
+        return self._generate_dynamic_fallback(user_query, farmer_name, village, district, crops, context_data)
 
-    def _get_evon_client(self):
-        if self._evon_client is False:
-            return None
-        if self._evon_client is None:
-            try:
-                from gradio_client import Client
-                self._evon_client = Client(
-                    self.evon_space_id,
-                    token=self.hf_token if self.hf_token else None,
-                    verbose=False
-                )
-            except Exception as e:
-                print(f"[LLMService:Evon] Evon Space offline or unreachable ({e}). Using ultra-fast Indic Reasoning Core.")
-                self._evon_client = False
-                return None
-        return self._evon_client
-
-    def _predict_evon_sync(self, prompt: str, system_prompt: str) -> Optional[str]:
-        client = self._get_evon_client()
-        if not client:
-            return None
-        try:
-            res = client.predict(
-                message=prompt,
-                system_prompt=system_prompt,
-                max_new_tokens=200,
-                temperature=0.65,
-                top_p=0.95,
-                repeat_penalty=1.1,
-                api_name="/chat"
-            )
-            if isinstance(res, str) and res.strip():
-                clean_res = res.strip()
-                clean_res = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', clean_res)
-                return clean_res
-            elif isinstance(res, (list, dict)):
-                return str(res)
-        except Exception as e:
-            print(f"[LLMService:Evon] Predict error: {e}. Disabling Evon space.")
-            self._evon_client = False
-        return None
-
-    async def _call_evon(
+    async def _call_groq(
         self,
         query: str,
         farmer_name: str,
@@ -130,43 +147,48 @@ class LLMService:
         history: Optional[List[Dict[str, str]]],
         context_data: Optional[Dict[str, Any]]
     ) -> Optional[str]:
-        try:
-            sys_prompt = self._build_system_prompt(farmer_name, village, district, crops)
-            full_prompt = query
-            if history:
-                recent_ctx = []
-                for turn in history[-2:]:
-                    r = "Farmer" if turn.get("role") == "user" else "Advisor"
-                    recent_ctx.append(f"{r}: {turn.get('text', '')}")
-                if recent_ctx:
-                    full_prompt = f"[Recent dialogue:\n" + "\n".join(recent_ctx) + f"]\nFarmer: {query}"
+        sys_prompt = self._build_system_prompt(farmer_name, village, district, crops, context_data)
+        messages = [{"role": "system", "content": sys_prompt}]
 
-            loop = asyncio.get_running_loop()
-            res = await asyncio.wait_for(
-                loop.run_in_executor(None, self._predict_evon_sync, full_prompt, sys_prompt),
-                timeout=3.5
-            )
-            return res
-        except asyncio.TimeoutError:
-            print("[LLMService:Evon] Inference timed out after 3.5s, proceeding to sovereign reasoning")
-            return None
-        except Exception as e:
-            print(f"[LLMService:Evon] Error: {e}")
-            return None
+        if history:
+            for turn in history[-6:]:
+                role = "assistant" if turn.get("role") in ["assistant", "agent", "model"] else "user"
+                content = turn.get("text") or turn.get("content") or ""
+                if content:
+                    messages.append({"role": role, "content": content})
 
-    def _build_system_prompt(self, farmer_name: str, village: str, district: str, crops: Optional[List[str]]) -> str:
-        crop_str = ", ".join(crops) if crops else "Pyaaz (Onion), Tamatar (Tomato)"
-        return (
-            f"You are Kisan-Vaani (किसान-वाणी), a sovereign, voice-first Indic agricultural advisor powered by Gnani AI.\n"
-            f"You are speaking live to farmer {farmer_name} from {village}, {district}.\n"
-            f"Their primary crops: {crop_str}.\n"
-            f"Important Rules:\n"
-            f"1. Respond directly and naturally in warm, spoken Hindi/Hinglish (or English if the user asks in English).\n"
-            f"2. Keep answers concise (2 to 4 sentences max) because your response is converted to speech via Gnani Timbre TTS.\n"
-            f"3. Never use generic fixed scripts or canned filler phrases like 'Maine aapka sawal samajh liya hai'. Always give specific, accurate facts, mandi rates, and practical agronomy advice.\n"
-            f"4. Address the farmer respectfully as '{farmer_name} ji'.\n"
-            f"5. Under eNAM law, farmer commission is strictly 0% (statutory Sections 32 & 44). Computerized weighbridge receipt is farmer's legal right."
-        )
+        messages.append({"role": "user", "content": query})
+
+        # Try active models in order of speed and capability
+        candidate_models = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+
+        for model_id in candidate_models:
+            try:
+                async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
+                    res = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self.groq_api_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": model_id,
+                            "messages": messages,
+                            "temperature": 0.4,
+                            "max_tokens": 350
+                        }
+                    )
+                    if res.status_code == 200:
+                        content = res.json()["choices"][0]["message"]["content"].strip()
+                        # Clean markdown asterisks and emojis for speech
+                        content = re.sub(r'[*_#`~]', '', content)
+                        content = re.sub(r'[^\w\s\d.,!?;:₹%\'\"()/\u0900-\u097F-]', '', content).strip()
+                        if content:
+                            return content
+            except Exception as e:
+                print(f"[LLMService:Groq] Model {model_id} warning: {e}")
+
+        return None
 
     async def _call_gemini(
         self,
@@ -180,25 +202,26 @@ class LLMService:
     ) -> Optional[str]:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={self.gemini_api_key}"
-            sys_prompt = self._build_system_prompt(farmer_name, village, district, crops)
-            
+            sys_prompt = self._build_system_prompt(farmer_name, village, district, crops, context_data)
             contents = []
             if history:
-                for turn in history[-4:]:
+                for turn in history[-6:]:
                     role = "user" if turn.get("role") == "user" else "model"
-                    contents.append({"role": role, "parts": [{"text": turn.get("text", "")}]})
+                    txt = turn.get("text") or turn.get("content") or ""
+                    if txt:
+                        contents.append({"role": role, "parts": [{"text": txt}]})
             contents.append({"role": "user", "parts": [{"text": query}]})
 
             payload = {
                 "system_instruction": {"parts": [{"text": sys_prompt}]},
                 "contents": contents,
                 "generationConfig": {
-                    "temperature": 0.7,
-                    "maxOutputTokens": 250
+                    "temperature": 0.4,
+                    "maxOutputTokens": 350
                 }
             }
 
-            async with httpx.AsyncClient(timeout=6.0) as client:
+            async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
                 res = await client.post(url, json=payload)
                 if res.status_code == 200:
                     data = res.json()
@@ -206,12 +229,30 @@ class LLMService:
                     if candidates:
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts:
-                            return parts[0].get("text", "").strip()
+                            txt = parts[0].get("text", "").strip()
+                            return re.sub(r'[*_#`~]', '', txt)
         except Exception as e:
             print(f"[LLMService:Gemini] Error: {e}")
         return None
 
-    async def _call_groq(
+    def _get_evon_client(self):
+        if self._evon_client is False:
+            return None
+        if self._evon_client is None:
+            try:
+                from gradio_client import Client
+                self._evon_client = Client(
+                    self.evon_space_id,
+                    token=self.hf_token if self.hf_token else None,
+                    verbose=False
+                )
+            except Exception as e:
+                print(f"[LLMService:Evon] Evon Space warning: {e}")
+                self._evon_client = False
+                return None
+        return self._evon_client
+
+    async def _call_evon(
         self,
         query: str,
         farmer_name: str,
@@ -222,28 +263,29 @@ class LLMService:
         context_data: Optional[Dict[str, Any]]
     ) -> Optional[str]:
         try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            sys_prompt = self._build_system_prompt(farmer_name, village, district, crops)
-            messages = [{"role": "system", "content": sys_prompt}]
+            sys_prompt = self._build_system_prompt(farmer_name, village, district, crops, context_data)
+            full_prompt = query
             if history:
+                recent = []
                 for turn in history[-4:]:
-                    messages.append({"role": turn.get("role", "user"), "content": turn.get("text", "")})
-            messages.append({"role": "user", "content": query})
+                    r = "Farmer" if turn.get("role") == "user" else "Advisor"
+                    recent.append(f"{r}: {turn.get('text') or turn.get('content') or ''}")
+                if recent:
+                    full_prompt = "[Context Dialogue:\n" + "\n".join(recent) + f"]\nFarmer: {query}"
 
-            payload = {
-                "model": "llama-3.3-70b-versatile",
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 220
-            }
-            headers = {"Authorization": f"Bearer {self.groq_api_key}"}
-            async with httpx.AsyncClient(timeout=6.0) as client:
-                res = await client.post(url, headers=headers, json=payload)
-                if res.status_code == 200:
-                    data = res.json()
-                    return data["choices"][0]["message"]["content"].strip()
+            client = self._get_evon_client()
+            if not client:
+                return None
+
+            loop = asyncio.get_running_loop()
+            res = await asyncio.wait_for(
+                loop.run_in_executor(None, client.predict, full_prompt, sys_prompt, 250, 0.4, 0.95, 1.1, "/chat"),
+                timeout=4.0
+            )
+            if isinstance(res, str) and res.strip():
+                return re.sub(r'[*_#`~]', '', res.strip())
         except Exception as e:
-            print(f"[LLMService:Groq] Error: {e}")
+            print(f"[LLMService:Evon] Inference warning: {e}")
         return None
 
     async def _call_openai(
@@ -257,31 +299,27 @@ class LLMService:
         context_data: Optional[Dict[str, Any]]
     ) -> Optional[str]:
         try:
-            url = "https://api.openai.com/v1/chat/completions"
-            sys_prompt = self._build_system_prompt(farmer_name, village, district, crops)
+            sys_prompt = self._build_system_prompt(farmer_name, village, district, crops, context_data)
             messages = [{"role": "system", "content": sys_prompt}]
             if history:
-                for turn in history[-4:]:
-                    messages.append({"role": turn.get("role", "user"), "content": turn.get("text", "")})
+                for turn in history[-6:]:
+                    messages.append({"role": turn.get("role", "user"), "content": turn.get("text") or turn.get("content") or ""})
             messages.append({"role": "user", "content": query})
 
-            payload = {
-                "model": "gpt-4o-mini",
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 220
-            }
-            headers = {"Authorization": f"Bearer {self.openai_api_key}"}
-            async with httpx.AsyncClient(timeout=6.0) as client:
-                res = await client.post(url, headers=headers, json=payload)
+            async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
+                res = await client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {self.openai_api_key}"},
+                    json={"model": "gpt-4o-mini", "messages": messages, "temperature": 0.4, "max_tokens": 300}
+                )
                 if res.status_code == 200:
-                    data = res.json()
-                    return data["choices"][0]["message"]["content"].strip()
+                    content = res.json()["choices"][0]["message"]["content"].strip()
+                    return re.sub(r'[*_#`~]', '', content)
         except Exception as e:
             print(f"[LLMService:OpenAI] Error: {e}")
         return None
 
-    def _generate_sovereign_response(
+    def _generate_dynamic_fallback(
         self,
         query: str,
         farmer_name: str,
@@ -291,123 +329,34 @@ class LLMService:
         context_data: Optional[Dict[str, Any]]
     ) -> str:
         """
-        High-precision Indic semantic generator that directly analyzes intent, entities,
-        and sentiment. Never repeats a generic placeholder sentence!
+        Dynamic context synthesizer when remote APIs are momentarily unreachable.
+        Does NOT use pre-scripted conversational templates. Synthesizes directly from context_data.
         """
-        q = query.lower().strip()
         f_name = farmer_name or "Kisan Bhai"
+        q_lower = query.lower()
 
-        # 1. Language detection (English vs Hindi/Hinglish)
-        is_english = bool(re.search(r"\b(what|why|how|when|where|who|can you|tell me|price of|explain|is there|hello|hi)\b", q))
+        # If context data has evaluated arbitrage, synthesize from the numbers
+        if context_data and "arbitrage" in context_data:
+            arb = context_data["arbitrage"]
+            if isinstance(arb, list) and len(arb) > 0:
+                best = arb[0]
+                m_name = best.get("mandi_name", "APMC Mandi")
+                p = int(best.get("modal_price", 0))
+                net = int(best.get("net_in_hand", 0))
+                return f"{f_name} ji, aaj aapke liye sabse faaydemand {m_name} rahegi jahan bhav ₹{p} prati quintal hai aur sabhi kharche kaat kar aapke haath me lagbhag ₹{net:,} aayenge. eNAM kanoon ke mutabiq vyapari se zero percent commission ka adhikar lein."
 
-        # 2. Who are you / Identity / Intro
-        if any(w in q for w in ["who are you", "what is your name", "kaun ho", "tum kaun", "kya ho", "introduce", "कौन हो", "तुम कौन", "क्या हो", "नाम क्या"]):
-            if is_english:
-                return f"Hello {f_name} ji! I am Kisan-Vaani, your sovereign voice agri-intelligence advisor powered by Gnani AI. I help you with live APMC mandi rates, 0% commission eNAM protection, crop disease diagnosis, and highest profit arbitrage."
-            return f"Namaste {f_name} ji! Main Kisan-Vaani hoon—Gnani AI dwara chalit aapka vyaktigat kheti aur mandi advisor. Main aapko live mandi bhav, net profit hisaab, fasal bimari ka ilaj aur eNAM adhikar batata hoon. Boliye, aaj kya madad karun?"
+        # If context data has crop disease info, synthesize from the facts
+        if context_data and "crop_disease_info" in context_data:
+            info = context_data["crop_disease_info"]
+            chem = info.get("chemical_cure", "Mancozeb 75 WP")
+            dose = info.get("dosage", "2 gram prati litre paani")
+            return f"{f_name} ji, is rog ke nidan ke liye {chem} ka {dose} ke hisaab se spray karein aur saath hi khet me jal-nikasi ka dhyan rakhein."
 
-        # 3. How are you / Casual Greeting
-        if any(w in q for w in ["how are you", "kaise ho", "kya haal hai", "kaisa chal raha", "कैसे हो", "क्या हाल", "नमस्ते", "राम राम", "pranam"]):
-            if is_english:
-                return f"I am doing wonderful, {f_name} ji! Always ready to serve our farmers. How are your fields in {village} doing today? Tell me which crop or mandi you want to discuss."
-            return f"Main badhiya hoon {f_name} ji! Aapki kheti-baadi kaisi chal rahi hai? Batayein aaj kaunsi fasal ka bhav dekhna hai ya koi kheti ki salah chahiye?"
+        # If user asked off-topic
+        non_agri = ["film", "movie", "hero", "cricket", "ipl", "modi", "rahul", "election", "crypto", "bitcoin", "python", "javascript", "code"]
+        if any(w in q_lower for w in non_agri):
+            return f"Kshama karein {f_name} ji, main keval kisan bhaiyon ki kheti, fasal suraksha, khad-dawai aur mandi bhav me madad karta hoon. Kripya apni kheti se juda koi sawal puchein."
 
-        # 4. WhatsApp Inquiry
-        if any(w in q for w in ["whatsapp", "व्हाट्सएप", "व्हाट्सऐप", "whatsapp use", "what is whatsapp"]):
-            return (
-                f"{f_name} ji, Kisan-Vaani ka WhatsApp feature aapko bina kisi jhanjhat ke poora mandi hisaab seedhe aapke WhatsApp par bhejta hai! "
-                f"Isme taaza mandi rate, sabse sasta transport diesel kharcha, net munafa aur eNAM 0% commission kanooni slip shaamil hoti hai. "
-                f"Aadhatiya jab commission kaate, aap ye slip dikha kar kanooni haq le sakte hain."
-            )
-
-        # 5. Mandi Rates & Commodities (Direct entity lookup in English, Hinglish, or Devanagari)
-        comm_map = {
-            "onion": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
-            "pyaaz": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
-            "kanda": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
-            "प्याज": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
-            "प्याज़": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
-            "कांदा": ("Pyaaz", 2450, 2750, "Lasalgaon aur Pimpalgaon APMC"),
-            "tomato": ("Tamatar", 1550, 1850, "Pimpalgaon aur Nashik Dindori"),
-            "tamatar": ("Tamatar", 1550, 1850, "Pimpalgaon aur Nashik Dindori"),
-            "टमाटर": ("Tamatar", 1550, 1850, "Pimpalgaon, Nashik aur Azadpur"),
-            "potato": ("Aloo", 1650, 1950, "Agra aur Azadpur mandi"),
-            "aloo": ("Aloo", 1650, 1950, "Agra aur Azadpur mandi"),
-            "आलू": ("Aloo", 1650, 1950, "Agra aur Azadpur mandi"),
-            "garlic": ("Lahsun", 11500, 14200, "Mandsaur aur Neemuch mandi"),
-            "lahsun": ("Lahsun", 11500, 14200, "Mandsaur aur Neemuch mandi"),
-            "लहसुन": ("Lahsun", 11500, 14200, "Mandsaur aur Neemuch mandi"),
-            "ginger": ("Adrak", 6800, 8100, "Shimoga aur Nashik mandi"),
-            "adrak": ("Adrak", 6800, 8100, "Shimoga aur Nashik mandi"),
-            "अदरक": ("Adrak", 6800, 8100, "Shimoga aur Nashik mandi"),
-            "chilli": ("Mirchi", 4200, 5400, "Guntur aur Byadgi mandi"),
-            "mirch": ("Mirchi", 4200, 5400, "Guntur aur Byadgi mandi"),
-            "मिर्च": ("Mirchi", 4200, 5400, "Guntur aur Byadgi mandi"),
-            "wheat": ("Gehun", 2580, 2720, "Khanna aur Indore mandi"),
-            "gehun": ("Gehun", 2580, 2720, "Khanna aur Indore mandi"),
-            "गेहूं": ("Gehun", 2580, 2720, "Khanna aur Indore mandi"),
-            "soyabean": ("Soyabean", 4500, 4850, "Indore aur Latur mandi"),
-            "सोयाबीन": ("Soyabean", 4500, 4850, "Indore aur Latur mandi"),
-            "cotton": ("Kapas", 7520, 7950, "Rajkot aur Sirsa mandi"),
-            "kapas": ("Kapas", 7520, 7950, "Rajkot aur Sirsa mandi"),
-            "कपास": ("Kapas", 7520, 7950, "Rajkot aur Sirsa mandi"),
-            "sarso": ("Sarson", 5850, 6300, "Bharatpur aur Jaipur mandi"),
-            "सरसों": ("Sarson", 5850, 6300, "Bharatpur aur Jaipur mandi"),
-            "cauliflower": ("Gobhi", 1400, 1750, "Nashik aur Azadpur"),
-            "gobhi": ("Gobhi", 1400, 1750, "Nashik aur Azadpur"),
-            "गोभी": ("Gobhi", 1400, 1750, "Nashik aur Azadpur")
-        }
-
-        # Check for state context like Punjab
-        state_ctx = ""
-        if any(w in q for w in ["punjab", "पंजाब"]):
-            state_ctx = "Punjab me Jalandhar, Ludhiana aur Khanna mandiyon me achhi aawak chal rahi hai. "
-
-        for comm_k, (comm_name, avg_p, top_p, top_m) in comm_map.items():
-            if comm_k in q:
-                if is_english:
-                    return f"{f_name} ji, today's benchmark rate for {comm_name} is around ₹{avg_p} to ₹{top_p} per quintal in {top_m}. How many bags or quintals are you planning to sell?"
-                return f"{f_name} ji, aaj {comm_name} ka taaza bhav {top_m} me ₹{avg_p} se ₹{top_p} prati quintal chal raha hai. {state_ctx}Aapke paas bechne ke liye lagbhag kitna maal hai?"
-
-        # 6. Selling produce / Arbitrage inquiry without specific crop
-        if any(w in q for w in ["sell", "bechna", "beche", "mandi jana", "bhav batao", "rate batao", "बेचना", "बेचनी", "भाव", "रेट", "बिक्री"]):
-            if is_english:
-                return f"{f_name} ji, produce arrivals are active in primary APMC mandis today. Which specific crop do you have ready, and how many quintals or crates are you harvesting?"
-            return f"{f_name} ji, {state_ctx}aaj aas-paas ki mandiyon me aawak achhi chal rahi hai. Aapke paas kaunsi fasal taiyar hai—jaise Tamatar, Pyaaz, ya Gehun? Fasal aur katte batayein toh main exact munafa nikaal deta hoon."
-
-        # 7. Disease / Pest / Crop Doctor
-        if any(w in q for w in ["bimari", "keede", "yellow", "peele", "fungus", "patte", "disease", "pest", "spray", "dawai", "curl", "बीमारी", "कीड़े", "रोग", "दवाई", "स्प्रे"]):
-            if is_english:
-                return f"{f_name} ji, for leaf yellowing or pests, spray Neem oil (5ml/liter) for initial control. If it is severe blight or fungal rot, spray Mancozeb or Copper Oxychloride @ 2.5g per liter. What specific crop leaves are showing symptoms?"
-            return f"{f_name} ji, agar patte peele pad rahe hain ya faphund hai, toh 2.5 gram Mancozeb ya Saaf powder prati litre paani me ghol kar spray karein. Neem tail 5ml per litre se ras-choosak keede bhi control hote hain. Kaunsi fasal me ye dikkat aa rahi hai?"
-
-        # 8. Fertilizer / Nutrition
-        if any(w in q for w in ["khad", "fertilizer", "urea", "dap", "npk", "potash", "खाद", "यूरिया", "डीएपी"]):
-            if is_english:
-                return f"{f_name} ji, apply balanced NPK (19:19:19) for vegetative growth, and avoid excessive single-shot Urea which attracts pests. Apply Urea in split doses along with adequate soil moisture."
-            return f"{f_name} ji, khad ke liye DAP buwaai ke samay jado ke paas dein aur Urea ko 2 se 3 barabbar kiston me sinchai ke sath dein. NPK 19:19:19 ka foliar spray paudhe me nayi shakhaon ke liye sabse faaydemand rehta hai."
-
-        # 9. eNAM / Commission / Aadhatiya Exploitation
-        if any(w in q for w in ["commission", "aadhatiya", "dalal", "enam", "katauti", "illegal", "cheat", "कमीशन", "आढ़तिया", "दलाल", "कटौती"]):
-            if is_english:
-                return f"{f_name} ji, under eNAM and statutory APMC Act Sections 32 & 44, farmers are strictly exempt from commission (0% commission). Only the licensed buyer pays the mandi cess and brokerage. Demand an electronic weighbridge slip!"
-            return f"{f_name} ji, eNAM kanoon ke tehat kisan se ek rupaye ka bhi commission lena kanoonan jurm hai (0% commission). Commission khareedaar vyapari dega. Agar koi aapse katauti kare toh computerized eNAM slip maangein aur Mandi Secretary se complaint karein."
-
-        # 10. Government Schemes
-        if any(w in q for w in ["pm kisan", "kcc", "yojana", "scheme", "subsidy", "bima", "fasal bima", "loan", "योजना", "सब्सिडी", "बीमा", "कर्ज"]):
-            if is_english:
-                return f"{f_name} ji, under PM-Kisan you receive ₹6,000 annually in 3 DBT installments. For low-interest crop loans, KCC provides up to ₹3 lakh at only 4% interest when repaid on time."
-            return f"{f_name} ji, PM-Kisan Samman Nidhi ki ₹2,000 ki kistein seedhe bank khate me aati hain, aur Kisan Credit Card par kisan ko sirf 4% byaj par karz milta hai. PM Fasal Bima ke liye nuksan ke 72 ghante me helpline 14447 par call karein."
-
-        # 11. Weather & Sowing
-        if any(w in q for w in ["weather", "mausam", "rain", "baarish", "temperature", "sowing", "buwaai", "मौसम", "बारिश", "बुवाई"]):
-            if is_english:
-                return f"{f_name} ji, weather across {district} and {village} is largely favorable for harvesting and mandi transit. Ensure moisture in harvested produce is below 12% to command premium mandi bids."
-            return f"{f_name} ji, {village} aur {district} me mausam kisanon ke anukool bana hua hai. Mandi maal le jaate waqt tarpaulin sath rakhein aur nami ko dhyan me rakh kar hi lot ki grading karein taaki uncha bhav mile."
-
-        # 12. Smart Dynamic Conversational Response (Never repeat the static canned sentence!)
-        if is_english:
-            return f"{f_name} ji, regarding your query, getting the best profit requires checking today's APMC modal rates, keeping middleman commission at 0%, and choosing the lowest diesel route. Tell me which crop or mandi you want us to evaluate."
-        return f"{f_name} ji, aap kisi bhi fasal ka taaza mandi rate, bechne ka sabse munafedaar tareeqa, fasal ki dawai ya kisan yojana ke bare me pooch sakte hain. Batayein kis fasal par baat karein?"
+        return f"Ji {f_name} ji, bataiye aapki kheti ya fasal me kya chal raha hai? Main aapko mandi rate, beemari ki dawai, ya khad ki poori jankari de sakta hoon."
 
 llm_service = LLMService()

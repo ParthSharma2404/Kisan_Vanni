@@ -502,10 +502,6 @@ window.replayAiText = function(btn) {
   }
 };
 
-window.playWelcomeAudio = function(btn) {
-  const welcomeText = "राम राम किसान भाई! मैं किसान-वाणी हूँ। आप बोलकर या लिखकर किसी भी फसल का ताज़ा मंडी भाव, बीमारी की दवाई, या सरकारी योजनाओं के बारे में पूछ सकते हैं।";
-  playGnaniAudio(welcomeText, null, btn);
-};
 
 // =====================================================================
 // 4. WEBSOCKET REAL-TIME CONNECTION
@@ -684,10 +680,9 @@ function finishAudioPlayback(activeBtn) {
   currentAudio = null;
   if (activeBtn) {
     activeBtn.classList.remove("playing");
-    const isWelcome = activeBtn.getAttribute("onclick") && activeBtn.getAttribute("onclick").includes("playWelcomeAudio");
     activeBtn.innerHTML = `
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-      <span>${isWelcome ? "सुनें" : "दोबारा सुनें"}</span>
+      <span>दोबारा सुनें</span>
     `;
   }
   setTurnState("ready");

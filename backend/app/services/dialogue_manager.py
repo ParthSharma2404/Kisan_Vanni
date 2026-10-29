@@ -7,7 +7,6 @@ from app.services.arbitrage_engine import arbitrage_engine
 from app.services.enam_rules import enam_advisor
 from app.services.crop_doctor import crop_doctor
 from app.services.farmer_db import farmer_db
-from app.services.agri_intelligence import agri_engine
 
 class SessionState:
     def __init__(self, session_id: str):
@@ -113,9 +112,19 @@ class DialogueManager:
                 # Silent background WhatsApp dispatch
                 dispatch_res = await self._dispatch_whatsapp_background(session.phone_number, slip.get("whatsapp_text", ""))
                 
-                spoken = (
-                    f"Ji {session.farmer_name} bhai, maine {best_name} ka poora hisaab, "
-                    f"diesel kharcha aur eNAM kanoon ka slip aapke WhatsApp number (+91 {session.phone_number}) par turant bhej diya hai!"
+                from app.services.llm_service import llm_service
+                spoken = await llm_service.generate_response(
+                    user_query=utterance,
+                    farmer_name=session.farmer_name,
+                    village=session.location_name or "",
+                    district=session.district or "",
+                    crops=[session.commodity] if session.commodity else None,
+                    history=session.chat_history,
+                    context_data={
+                        "action": "WhatsApp receipt sent",
+                        "mandi_name": best_name,
+                        "phone": session.phone_number
+                    }
                 )
                 session.add_history("assistant", spoken)
                 return {
@@ -131,14 +140,14 @@ class DialogueManager:
                     }
                 }
 
-        # 2. Check for Contextual Distance / Nearest Mandi Questions
-        distance_query = self._handle_distance_or_mandi_query(session, text)
+        # 2. Check for Contextual Distance / Nearest Mandi Questions via Dynamic LLM
+        distance_query = await self._handle_distance_or_mandi_query_dynamic(session, utterance)
         if distance_query:
             if distance_query.get("spoken_text"):
                 session.add_history("assistant", distance_query["spoken_text"])
             return distance_query
 
-        # 3. Agentic Agricultural Router (Guardrails + Dynamic Tool Routing + Rolling Memory)
+        # 3. Agentic Agricultural Router (Dynamic Context + Generative LLM Reasoning)
         from app.services.agri_router import agri_router
         res = await agri_router.route_and_execute(utterance, session)
         if res and res.get("spoken_text"):
@@ -218,44 +227,31 @@ class DialogueManager:
             return loc_match.group(1).capitalize()
         return None
 
-    def _handle_distance_or_mandi_query(self, session: SessionState, text: str) -> Optional[Dict[str, Any]]:
-        if any(w in text for w in ["kitna door", "kitni door", "distance", "kilo meter", "km", "door hai", "nazdeek", "paas hai"]):
-            candidates = mandi_service.get_rates_for_commodity(
-                session.commodity or "onion", session.lat, session.lon, radius_km=100
-            )
-            for m in candidates:
-                m_name = m["market"].lower()
-                if m_name in text or any(part in text for part in m_name.split()):
-                    dist = m.get("distance_km", 25)
-                    rate = int(m.get("modal_price", 2400))
-                    return {
-                        "spoken_text": f"Bhaiya, {m['market']} Mandi aapke yahan se lagbhag {dist} kilometer door hai. Wahan aaj ka modal bhav ₹{rate} prati quintal hai.",
-                        "step": session.step,
-                        "data": {"distance_km": dist, "mandi": m, "evaluated_mandis": session.last_arbitrage_results}
-                    }
-            if candidates:
-                closest = min(candidates, key=lambda x: x.get("distance_km", 999))
-                return {
-                    "spoken_text": f"Kisan bhai, aapke sabse nazdeek {closest['market']} Mandi hai, jo lagbhag {closest['distance_km']} km door hai.",
-                    "step": session.step,
-                    "data": {"closest_mandi": closest, "evaluated_mandis": session.last_arbitrage_results}
-                }
-
-        if any(w in text for w in ["sabse zyada", "sabse uncha", "highest", "top rate", "sabse bada rate"]):
+    async def _handle_distance_or_mandi_query_dynamic(self, session: SessionState, text: str) -> Optional[Dict[str, Any]]:
+        clean_text = text.lower()
+        if any(w in clean_text for w in ["kitna door", "kitni door", "distance", "kilo meter", "km", "door hai", "nazdeek", "paas hai", "sabse zyada", "sabse uncha", "highest", "top rate", "sabse bada rate"]):
             candidates = mandi_service.get_rates_for_commodity(
                 session.commodity or "onion", session.lat, session.lon, radius_km=100
             )
             if candidates:
-                top_rate_mandi = max(candidates, key=lambda x: float(x.get("modal_price", 0)))
+                from app.services.llm_service import llm_service
+                spoken = await llm_service.generate_response(
+                    user_query=text,
+                    farmer_name=session.farmer_name,
+                    village=session.location_name or "",
+                    district=session.district or "",
+                    crops=[session.commodity] if session.commodity else None,
+                    history=session.chat_history,
+                    context_data={"nearby_mandis_with_distances": candidates[:4]}
+                )
                 return {
-                    "spoken_text": f"Kisan bhai, aaj sabse uncha bhav {top_rate_mandi['market']} Mandi me hai, lagbhag ₹{int(top_rate_mandi['modal_price'])} prati quintal.",
+                    "spoken_text": spoken,
                     "step": session.step,
-                    "data": {"top_rate_mandi": top_rate_mandi, "evaluated_mandis": session.last_arbitrage_results}
+                    "data": {"nearby_mandis": candidates[:4], "evaluated_mandis": session.last_arbitrage_results}
                 }
-
         return None
 
-    def _compute_and_deliver_arbitrage(self, session: SessionState) -> Dict[str, Any]:
+    async def _compute_and_deliver_arbitrage(self, session: SessionState) -> Dict[str, Any]:
         session.step = "ARBITRAGE_DELIVERED"
         has_own = session.has_own_vehicle if session.has_own_vehicle is not None else True
 
@@ -269,16 +265,24 @@ class DialogueManager:
             already_at_mandi=False
         )
         session.last_arbitrage_results = evaluated
-
-        reasoning = arbitrage_engine.generate_verbal_reasoning(
-            evaluated, session.commodity or "pyaaz", session.quantity_quintals or 10.0
-        )
-
         slip = self._generate_enhanced_slip(session)
         session.mandi_slip = slip
 
-        enam_reminder = " Aur eNAM kanoon ke mutabik commission zero percent hai, aadhatiya commission nahi kaat sakta."
-        full_speech = reasoning + enam_reminder
+        from app.services.llm_service import llm_service
+        full_speech = await llm_service.generate_response(
+            user_query=f"{session.commodity} {session.quantity_quintals} quintal bhav and net profit",
+            farmer_name=session.farmer_name,
+            village=session.location_name or "",
+            district=session.district or "",
+            crops=[session.commodity] if session.commodity else None,
+            history=session.chat_history,
+            context_data={
+                "crop": session.commodity,
+                "quantity_quintals": session.quantity_quintals,
+                "arbitrage": evaluated[:3] if evaluated else [],
+                "enam_rules": "0% commission under eNAM Section 32 & 44"
+            }
+        )
 
         try:
             best_m = evaluated[0] if evaluated else {}
