@@ -66,6 +66,7 @@ const turnStatusText = document.getElementById("turnStatusText");
 
 const chatTextForm = document.getElementById("chatTextForm");
 const chatTextInput = document.getElementById("chatTextInput");
+const sendTextBtn = document.getElementById("sendTextBtn");
 const mainMicBtn = document.getElementById("mainMicBtn");
 const micIconHolder = document.getElementById("micIconHolder");
 
@@ -1336,6 +1337,21 @@ async function startMicrophoneRecording() {
   }
 }
 
+function stopRecording() {
+  isRecording = false;
+  isSpeaking = false;
+  silenceStartTime = 0;
+  speechStartTime = 0;
+  audioBufferChunks = [];
+  preRollBuffer = [];
+  if (audioProcessor && audioSource) {
+    try {
+      audioSource.disconnect();
+      audioProcessor.disconnect();
+    } catch (e) {}
+  }
+}
+
 function stopRecordingAndSend() {
   isRecording = false;
   if (audioProcessor && audioSource) {
@@ -1446,44 +1462,55 @@ let isSubmittingText = false;
 let pendingTextTimeout = null;
 
 async function submitUserText() {
-  const text = chatTextInput.value.trim();
+  const inputEl = document.getElementById("chatTextInput");
+  const text = (inputEl ? inputEl.value : "").trim();
   if (!text || isSubmittingText) return;
 
   isSubmittingText = true;
-  chatTextInput.value = "";
-  chatTextInput.blur();
-
-  // Stop any active recording so mic noise never interferes with typed query
-  stopRecording();
-
-  renderUserMessage(text);
-  SoundFX.playSend();
-  setTurnState("reasoning", "Preparing answer...");
-
-  // Watchdog fallback: if WebSocket does not answer within 7 seconds, call REST endpoint directly!
-  if (pendingTextTimeout) clearTimeout(pendingTextTimeout);
-  pendingTextTimeout = setTimeout(async () => {
-    console.warn("[Chat] WebSocket response timeout (7s). Calling fallback REST /api/chat...");
-    await fetchChatFallback(text);
-  }, 7000);
-
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({
-      type: "user_text",
-      text: text
-    }));
-  } else {
-    console.warn("[Chat] WebSocket not open. Calling fallback REST /api/chat immediately...");
-    if (pendingTextTimeout) {
-      clearTimeout(pendingTextTimeout);
-      pendingTextTimeout = null;
-    }
-    await fetchChatFallback(text);
+  if (inputEl) {
+    inputEl.value = "";
+    inputEl.blur();
   }
 
-  setTimeout(() => {
-    isSubmittingText = false;
-  }, 400);
+  // Safely stop any active recording so mic noise never interferes with typed query
+  try {
+    stopRecording();
+  } catch (e) {
+    console.warn("[Mic] Stop recording note:", e);
+  }
+
+  try {
+    renderUserMessage(text);
+    SoundFX.playSend();
+    setTurnState("reasoning", "Preparing answer...");
+
+    // Watchdog fallback: if WebSocket does not answer within 7 seconds, call REST endpoint directly!
+    if (pendingTextTimeout) clearTimeout(pendingTextTimeout);
+    pendingTextTimeout = setTimeout(async () => {
+      console.warn("[Chat] WebSocket response timeout (7s). Calling fallback REST /api/chat...");
+      await fetchChatFallback(text);
+    }, 7000);
+
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "user_text",
+        text: text
+      }));
+    } else {
+      console.warn("[Chat] WebSocket not open. Calling fallback REST /api/chat immediately...");
+      if (pendingTextTimeout) {
+        clearTimeout(pendingTextTimeout);
+        pendingTextTimeout = null;
+      }
+      await fetchChatFallback(text);
+    }
+  } catch (err) {
+    console.error("[Chat] Error submitting text:", err);
+  } finally {
+    setTimeout(() => {
+      isSubmittingText = false;
+    }, 350);
+  }
 }
 
 async function fetchChatFallback(text) {
@@ -1602,11 +1629,27 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Chat text form submit
+  // Chat text form submit, button click, and Enter key
   if (chatTextForm) {
     chatTextForm.addEventListener("submit", (e) => {
       e.preventDefault();
       submitUserText();
+    });
+  }
+
+  if (sendTextBtn) {
+    sendTextBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      submitUserText();
+    });
+  }
+
+  if (chatTextInput) {
+    chatTextInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        submitUserText();
+      }
     });
   }
 
