@@ -17,27 +17,27 @@ class Settings(BaseModel):
     HOST: str = "0.0.0.0"
 
     # Gnani.ai / Vachana Credentials & Endpoints
-    GNANI_API_KEY: str = os.getenv("GNANI_API_KEY", "")
+    GNANI_API_KEY: str = os.getenv("GNANI_API_KEY", "").strip()
     GNANI_TTS_API_URL: str = os.getenv("GNANI_TTS_API_URL", "https://api.vachana.ai/api/v1/tts/inference")
     GNANI_STT_API_URL: str = os.getenv("GNANI_STT_API_URL", "https://api.vachana.ai/stt/v3")
     GNANI_STT_WS_URL: str = os.getenv("GNANI_STT_WS_URL", "wss://api.vachana.ai/stt/v3/stream")
 
     # Government Open Data API (data.gov.in)
-    DATA_GOV_API_KEY: str = os.getenv("DATA_GOV_API_KEY", "")
+    DATA_GOV_API_KEY: str = os.getenv("DATA_GOV_API_KEY", "").strip()
     MANDI_RESOURCE_ID: str = "9ef84268-d588-465a-a308-a864a43d0070"
 
     # LLM Inference Providers (Gnani Evon Sovereign LLM)
-    HF_TOKEN: str = os.getenv("HF_TOKEN", "")
-    HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY", "")
+    HF_TOKEN: str = os.getenv("HF_TOKEN", "").strip()
+    HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY", "").strip()
     EVON_SPACE_ID: str = os.getenv("EVON_SPACE_ID", "luminenio/gnani-evon-v3.3-chat")
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "").strip()
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "").strip()
 
     # Supabase Credentials
-    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_PUBLISHABLE_KEY: str = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
-    SUPABASE_SECRET_KEY: str = os.getenv("SUPABASE_SECRET_KEY", "")
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "").strip()
+    SUPABASE_PUBLISHABLE_KEY: str = os.getenv("SUPABASE_PUBLISHABLE_KEY", "").strip()
+    SUPABASE_SECRET_KEY: str = os.getenv("SUPABASE_SECRET_KEY", "").strip()
 
 
     # Logistics Defaults

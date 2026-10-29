@@ -202,43 +202,43 @@ html, body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
 
-/* User Account Chip */
+/* User Account Chip: Circular Person Icon across all viewports */
 .user-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   background: var(--bg-cloud);
   border: 1px solid var(--border-hairline);
-  border-radius: 9999px;
-  padding: 5px 9px;
-  font-size: 11px;
-  font-weight: 600;
+  border-radius: 50%;
+  padding: 0;
   color: var(--carbon-black);
   cursor: pointer;
   transition: all 0.18s ease;
-  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .user-chip:hover {
   background: var(--bg-cloud-hover);
+  border-color: var(--border-subtle);
+  transform: scale(1.05);
 }
 
-/* On mobile / narrow viewports, condense user chip to an elegant icon button */
-@media (max-width: 480px) {
-  .user-phone-text {
-    display: none !important;
-  }
-  .user-chip {
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    justify-content: center;
-    border-radius: 50%;
-  }
-  .user-chip .user-icon svg {
-    width: 14px;
-    height: 14px;
-  }
+.user-chip .user-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-chip .user-icon svg {
+  width: 15px;
+  height: 15px;
+  color: var(--carbon-black);
+}
+
+.user-phone-text {
+  display: none !important;
 }
 
 /* Language Selector Dropdown */

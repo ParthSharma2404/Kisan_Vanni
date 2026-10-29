@@ -21,7 +21,7 @@ from app.config import settings
 class LLMService:
     def __init__(self):
         self.groq_api_key = os.getenv("GROQ_API_KEY", "").strip() or settings.GROQ_API_KEY
-        self.hf_token = os.getenv("HF_TOKEN", "").strip() or os.getenv("HUGGINGFACE_API_KEY", "").strip()
+        self.hf_token = os.getenv("HF_TOKEN", "").strip() or os.getenv("HUGGINGFACE_API_KEY", "").strip() or settings.HF_TOKEN
         self.evon_space_id = os.getenv("EVON_SPACE_ID", "luminenio/gnani-evon-v3.3-chat").strip()
         self.gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip() or settings.GEMINI_API_KEY
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "").strip() or settings.OPENAI_API_KEY
