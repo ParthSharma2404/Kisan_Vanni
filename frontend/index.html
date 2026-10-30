@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=24">
+  <link rel="stylesheet" href="style.css?v=27">
 </head>
 <body class="ai-buddy-body">
   <!-- Faint topographic background contours -->
@@ -83,6 +83,39 @@
 
     <!-- Main Scrollable Chat Feed Area -->
     <main class="chat-feed-container" id="chatFeed">
+      <!-- Varied-Size Skeleton Feed for Startup & Fresh Sessions -->
+      <div id="skeletonFeed" class="skeleton-feed" style="display: none;">
+        <!-- Skeleton Card 1: Greeting (Small) -->
+        <div class="skeleton-card ai-skel">
+          <div class="skeleton-header">
+            <div class="skeleton-avatar skeleton-pulse"></div>
+            <div class="skeleton-pulse" style="width: 100px; height: 16px; border-radius: 9999px;"></div>
+          </div>
+          <div class="skeleton-line skeleton-pulse" style="width: 90%;"></div>
+          <div class="skeleton-line skeleton-pulse" style="width: 60%;"></div>
+        </div>
+
+        <!-- Skeleton Card 2: User Message (Right-aligned Pill) -->
+        <div class="skeleton-card user-skel">
+          <div class="skeleton-pulse" style="width: 150px; height: 38px; border-radius: 18px;"></div>
+        </div>
+
+        <!-- Skeleton Card 3: Rich Mandi Widget & Advice (Large) -->
+        <div class="skeleton-card ai-skel">
+          <div class="skeleton-header">
+            <div class="skeleton-avatar skeleton-pulse"></div>
+            <div class="skeleton-pulse" style="width: 130px; height: 16px; border-radius: 9999px;"></div>
+          </div>
+          <div class="skeleton-line skeleton-pulse" style="width: 95%;"></div>
+          <div class="skeleton-line skeleton-pulse" style="width: 82%;"></div>
+          <div class="skeleton-widget skeleton-pulse" style="height: 110px; width: 100%; border-radius: 16px; margin: 10px 0;"></div>
+          <div class="skeleton-chips" style="display: flex; gap: 8px;">
+            <div class="skeleton-pulse" style="width: 95px; height: 32px; border-radius: 16px;"></div>
+            <div class="skeleton-pulse" style="width: 115px; height: 32px; border-radius: 16px;"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Dynamic Messages Will Append Here -->
       <div id="dynamicMessagesContainer"></div>
 
@@ -141,7 +174,7 @@
     </footer>
   </div>
 
-  <!-- ONBOARDING & LOGIN MODAL: Clean ChatGPT Style -->
+  <!-- ONBOARDING & LOGIN MODAL: Multi-Step Permissions Gate -->
   <div class="login-modal-overlay" id="loginModalOverlay" style="display: none;">
     <div class="login-card" id="loginCard">
       <div class="login-logo-container">
@@ -150,6 +183,7 @@
       <p class="login-desc">Sovereign voice-enabled Krishi companion. Real-time mandi rates, crop advisory, and eNAM rights.</p>
 
       <form id="loginPhoneForm" class="login-form">
+        <div class="login-field-label">Mobile Number</div>
         <div class="login-input-group">
           <span class="flag-prefix">+91</span>
           <input 
@@ -163,8 +197,45 @@
             autofocus
           >
         </div>
+
+        <div class="login-field-label" style="margin-top: 14px;">Your Name</div>
+        <div class="login-input-group" style="padding-left: 14px;">
+          <input 
+            type="text" 
+            id="loginNameInput" 
+            placeholder="e.g. Parth" 
+            autocomplete="name"
+            style="border: none; background: transparent; width: 100%; outline: none; font-size: 15px; font-weight: 600; color: var(--carbon-black);"
+          >
+        </div>
+
+        <!-- Permissions Gate Cards -->
+        <div class="permissions-gate-container">
+          <div class="perm-card" id="permLocationCard">
+            <div class="perm-icon">📍</div>
+            <div class="perm-info">
+              <div class="perm-title">GPS Location Access</div>
+              <div class="perm-desc" id="permLocationDesc">Needed to calculate nearest APMC mandis & live freight.</div>
+            </div>
+            <button type="button" class="btn-perm" id="btnAllowLocation">
+              Detect GPS
+            </button>
+          </div>
+
+          <div class="perm-card" id="permMicCard">
+            <div class="perm-icon">🎙️</div>
+            <div class="perm-info">
+              <div class="perm-title">Microphone Access</div>
+              <div class="perm-desc" id="permMicDesc">Needed for hands-free voice Krishi advisory.</div>
+            </div>
+            <button type="button" class="btn-perm" id="btnAllowMic">
+              Enable Mic
+            </button>
+          </div>
+        </div>
+
         <button type="submit" id="loginSubmitBtn" class="btn-login-start">
-          Continue to App
+          Start Kisan-Vaani
         </button>
       </form>
     </div>
@@ -194,6 +265,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=26"></script>
+  <script src="app.js?v=27"></script>
 </body>
 </html>

@@ -60,27 +60,33 @@ class VoiceGatewaySession:
 
         if farmer:
             dm_session.farmer_name = farmer.get("name", "Kisan Bhai")
-            dm_session.district = farmer.get("district") or ""
-            dm_session.state = farmer.get("state") or ""
-            dm_session.location_name = farmer.get("village") or ""
+            dm_session.district = farmer.get("district") or "Patiala"
+            dm_session.state = farmer.get("state") or "Punjab"
+            dm_session.location_name = farmer.get("village") or "Hardaspur"
+            if farmer.get("latitude"): dm_session.lat = float(farmer["latitude"])
+            if farmer.get("longitude"): dm_session.lon = float(farmer["longitude"])
             dm_session.step = "ACTIVE"
         else:
-            dm_session.farmer_name = "Kisan Bhai"
-            dm_session.district = ""
-            dm_session.state = ""
-            dm_session.location_name = ""
+            dm_session.farmer_name = data.get("farmer_name") or "Parth"
+            dm_session.location_name = data.get("location") or "Hardaspur"
+            dm_session.district = "Patiala"
+            dm_session.state = "Punjab"
+            dm_session.lat = float(data.get("latitude", 30.3398))
+            dm_session.lon = float(data.get("longitude", 76.3869))
             dm_session.step = "ACTIVE"
             if self.phone_number:
                 try:
                     farmer = farmer_db.update_farmer_profile(
                         phone_number=self.phone_number,
-                        name="Kisan Bhai",
-                        village="",
-                        district="",
-                        state="",
+                        name=dm_session.farmer_name,
+                        village=dm_session.location_name,
+                        district=dm_session.district,
+                        state=dm_session.state,
+                        latitude=dm_session.lat,
+                        longitude=dm_session.lon,
                         primary_crops=[]
                     )
-                    print(f"[VoiceGateway] Auto-persisted new farmer {self.phone_number} to Supabase")
+                    print(f"[VoiceGateway] Auto-persisted verified farmer {self.phone_number} ({dm_session.location_name})")
                 except Exception as e:
                     print(f"[VoiceGateway] Farmer auto-persist error: {e}")
 

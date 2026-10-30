@@ -75,6 +75,37 @@ const waSummaryText = document.getElementById("waSummaryText");
 const waDirectSendBtn = document.getElementById("waDirectSendBtn");
 const waCloseBtn = document.getElementById("waCloseBtn");
 
+// Onboarding & Permissions Gate Elements
+const loginNameInput = document.getElementById("loginNameInput");
+const btnAllowLocation = document.getElementById("btnAllowLocation");
+const permLocationDesc = document.getElementById("permLocationDesc");
+const permLocationCard = document.getElementById("permLocationCard");
+const btnAllowMic = document.getElementById("btnAllowMic");
+const permMicDesc = document.getElementById("permMicDesc");
+const permMicCard = document.getElementById("permMicCard");
+const skeletonFeed = document.getElementById("skeletonFeed");
+
+let activeFarmerName = localStorage.getItem("kisan_auth_name") || "Parth";
+let activeLocation = localStorage.getItem("kisan_auth_location") || "Hardaspur, Punjab";
+let activeLat = parseFloat(localStorage.getItem("kisan_lat") || "30.3398");
+let activeLon = parseFloat(localStorage.getItem("kisan_lon") || "76.3869");
+
+// Strict Anti-Urdu Unicode Firewall (Arabic/Urdu script blocks)
+const URDU_ARABIC_REGEX = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/g;
+
+function sanitizeAntiUrdu(text) {
+  if (!text) return "";
+  return text.replace(URDU_ARABIC_REGEX, "").trim();
+}
+
+function showSkeletonFeed() {
+  if (skeletonFeed) skeletonFeed.style.display = "flex";
+}
+
+function hideSkeletonFeed() {
+  if (skeletonFeed) skeletonFeed.style.display = "none";
+}
+
 // SVG Icons
 const MIC_IDLE_SVG = `
   <svg class="mic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
@@ -389,6 +420,7 @@ function getTodayDateKey() {
 
 function initSessionAndStorage() {
   const savedPhone = localStorage.getItem("kisan_auth_phone");
+  const savedLoc = localStorage.getItem("kisan_auth_location");
   const todayKey = getTodayDateKey();
 
   // Purge any stored chat histories from previous days (24h retention)
@@ -399,17 +431,30 @@ function initSessionAndStorage() {
     }
   }
 
-  if (savedPhone && savedPhone.length === 10) {
-    activePhone = savedPhone;
-    sessionId = `call_${activePhone}_${todayKey.replace(/-/g, '')}`;
-    if (topUserPhoneText) topUserPhoneText.innerText = `+91 ${activePhone}`;
-    if (loginModalOverlay) loginModalOverlay.style.display = "none";
-    loadTodayChatHistory();
-    connectWebSocket();
-  } else {
+  // Strict Onboarding Gate: If new user or missing phone, FREEZE EVERYTHING in background!
+  if (!savedPhone || savedPhone.length !== 10) {
+    console.log("[Gate] Unregistered user. Freezing background activity until onboarded.");
     if (loginModalOverlay) loginModalOverlay.style.display = "flex";
     if (loginPhoneInput) loginPhoneInput.focus();
+    return;
   }
+
+  // Existing verified user
+  activePhone = savedPhone;
+  activeFarmerName = localStorage.getItem("kisan_auth_name") || "Parth";
+  activeLocation = savedLoc || "Hardaspur, Punjab";
+  activeLat = parseFloat(localStorage.getItem("kisan_lat") || "30.3398");
+  activeLon = parseFloat(localStorage.getItem("kisan_lon") || "76.3869");
+  sessionId = `call_${activePhone}_${todayKey.replace(/-/g, '')}`;
+
+  if (topUserPhoneText) topUserPhoneText.innerText = `+91 ${activePhone}`;
+  if (loginModalOverlay) loginModalOverlay.style.display = "none";
+
+  // Show varied skeletons while loading and connecting
+  showSkeletonFeed();
+
+  loadTodayChatHistory();
+  connectWebSocket();
 }
 
 function saveTodayChatMessage(role, text, extra = {}) {
@@ -583,6 +628,7 @@ function scrollToBottom() {
 
 function renderUserMessage(text, save = true) {
   if (!dynamicMessagesContainer || !text) return;
+  hideSkeletonFeed();
 
   // Deduplicate consecutive identical user messages in the DOM
   const lastMsg = dynamicMessagesContainer.lastElementChild;
@@ -838,6 +884,7 @@ window.handleQuickChipClick = function(chipText) {
 
 function renderAiCard(text, extra = {}, save = true, audioBase64 = "") {
   if (!dynamicMessagesContainer || !text) return;
+  hideSkeletonFeed();
   if (reasoningIndicator) reasoningIndicator.style.display = "none";
 
   const row = document.createElement("div");
@@ -1005,6 +1052,10 @@ function connectWebSocket() {
         type: "start_call",
         session_id: sessionId,
         phone_number: activePhone,
+        farmer_name: activeFarmerName,
+        location: activeLocation,
+        latitude: activeLat,
+        longitude: activeLon,
         language: currentLanguage
       }));
       setTurnState("ready");
@@ -1270,7 +1321,7 @@ function startBrowserSpeechRecognition() {
           interim += event.results[i][0].transcript;
         }
       }
-      liveTranscribedText = (final + interim).trim();
+      liveTranscribedText = sanitizeAntiUrdu((final + interim).trim());
       if (liveTranscribedText && turnStatusText && isRecording) {
         turnStatusText.innerText = `🎙️ "${liveTranscribedText}"`;
       }
@@ -1520,7 +1571,7 @@ let pendingTextTimeout = null;
 
 async function submitUserText() {
   const inputEl = document.getElementById("chatTextInput");
-  const text = (inputEl ? inputEl.value : "").trim();
+  const text = sanitizeAntiUrdu(inputEl ? inputEl.value : "").trim();
   if (!text || isSubmittingText) return;
 
   isSubmittingText = true;
@@ -1642,7 +1693,75 @@ document.addEventListener("DOMContentLoaded", () => {
   initLanguageSelector();
   initSessionAndStorage();
 
-  // Login form submit
+  // Permission: GPS Location
+  if (btnAllowLocation) {
+    btnAllowLocation.addEventListener("click", () => {
+      btnAllowLocation.innerText = "Locating...";
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            activeLat = lat;
+            activeLon = lon;
+            try {
+              const res = await fetch(`${API_BASE}/api/location/reverse?lat=${lat}&lon=${lon}&phone=${(loginPhoneInput ? loginPhoneInput.value : '') || activePhone}`);
+              const data = await res.json();
+              activeLocation = data.formatted_location || "Hardaspur, Punjab";
+            } catch (e) {
+              activeLocation = "Hardaspur, Punjab";
+            }
+            localStorage.setItem("kisan_auth_location", activeLocation);
+            localStorage.setItem("kisan_lat", activeLat);
+            localStorage.setItem("kisan_lon", activeLon);
+            if (permLocationDesc) permLocationDesc.innerText = `✓ Verified: ${activeLocation}`;
+            btnAllowLocation.innerText = "✓ Granted";
+            btnAllowLocation.classList.add("granted");
+            if (permLocationCard) permLocationCard.classList.add("granted");
+          },
+          (err) => {
+            console.warn("[GPS] Fallback to Hardaspur:", err);
+            activeLocation = "Hardaspur, Punjab";
+            activeLat = 30.3398;
+            activeLon = 76.3869;
+            localStorage.setItem("kisan_auth_location", activeLocation);
+            localStorage.setItem("kisan_lat", activeLat);
+            localStorage.setItem("kisan_lon", activeLon);
+            if (permLocationDesc) permLocationDesc.innerText = "✓ Verified: Hardaspur, Punjab";
+            btnAllowLocation.innerText = "✓ Set";
+            btnAllowLocation.classList.add("granted");
+            if (permLocationCard) permLocationCard.classList.add("granted");
+          },
+          { timeout: 7000 }
+        );
+      } else {
+        activeLocation = "Hardaspur, Punjab";
+        localStorage.setItem("kisan_auth_location", activeLocation);
+        if (permLocationDesc) permLocationDesc.innerText = "✓ Verified: Hardaspur, Punjab";
+        btnAllowLocation.innerText = "✓ Set";
+        btnAllowLocation.classList.add("granted");
+        if (permLocationCard) permLocationCard.classList.add("granted");
+      }
+    });
+  }
+
+  // Permission: Microphone
+  if (btnAllowMic) {
+    btnAllowMic.addEventListener("click", () => {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        mediaStream = stream;
+        btnAllowMic.innerText = "✓ Ready";
+        btnAllowMic.classList.add("granted");
+        if (permMicCard) permMicCard.classList.add("granted");
+        if (permMicDesc) permMicDesc.innerText = "✓ Microphone access granted.";
+      }).catch((err) => {
+        btnAllowMic.innerText = "Retry";
+        if (permMicDesc) permMicDesc.innerText = "Please allow mic in browser settings.";
+      });
+    });
+  }
+
+  // Login / Onboarding form submit
   if (loginPhoneForm) {
     loginPhoneForm.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -1651,11 +1770,28 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("Please enter a valid 10-digit mobile number.");
         return;
       }
+      const name = loginNameInput && loginNameInput.value.trim() ? loginNameInput.value.trim() : "Parth";
+      if (!activeLocation) {
+        activeLocation = "Hardaspur, Punjab";
+        activeLat = 30.3398;
+        activeLon = 76.3869;
+      }
+
       localStorage.setItem("kisan_auth_phone", phone);
+      localStorage.setItem("kisan_auth_name", name);
+      localStorage.setItem("kisan_auth_location", activeLocation);
+      localStorage.setItem("kisan_lat", activeLat);
+      localStorage.setItem("kisan_lon", activeLon);
+
       activePhone = phone;
+      activeFarmerName = name;
       sessionId = `call_${activePhone}_${getTodayDateKey().replace(/-/g, '')}`;
+
       if (topUserPhoneText) topUserPhoneText.innerText = `+91 ${activePhone}`;
       if (loginModalOverlay) loginModalOverlay.style.display = "none";
+
+      // Render varied skeletons immediately on submit
+      showSkeletonFeed();
 
       loadTodayChatHistory();
       connectWebSocket();

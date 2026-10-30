@@ -161,7 +161,9 @@ class FarmerDatabase:
         acreage: Optional[float] = None,
         primary_crops: Optional[List[str]] = None,
         own_transport: Optional[str] = None,
-        language: Optional[str] = None
+        language: Optional[str] = None,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None
     ) -> Dict[str, Any]:
         phone = self.clean_phone(phone_number)
         existing = self.get_farmer(phone)
@@ -175,6 +177,8 @@ class FarmerDatabase:
         new_crops = primary_crops if primary_crops is not None else (existing.get("primary_crops", []) if existing else [])
         new_transport = own_transport if own_transport is not None else (existing.get("own_transport", "") if existing else "")
         new_lang = language if language is not None else (existing.get("language", "en-US") if existing else "en-US")
+        new_lat = latitude if latitude is not None else (existing.get("latitude", 0.0) if existing else 0.0)
+        new_lon = longitude if longitude is not None else (existing.get("longitude", 0.0) if existing else 0.0)
 
         farmer_record = {
             "phone_number": phone,
@@ -186,6 +190,8 @@ class FarmerDatabase:
             "primary_crops": new_crops,
             "own_transport": new_transport,
             "language": new_lang,
+            "latitude": new_lat,
+            "longitude": new_lon,
             "updated_at": now_ts
         }
 

@@ -1,16 +1,21 @@
 """
-Kisan-Vaani Superpowered Speech-to-Text (STT) Engine
+Kisan-Vaani Superpowered Speech-to-Text (STT) Engine with Anti-Urdu Firewall
 Dual-Engine Architecture:
 1. Groq Whisper Large v3 (whisper-large-v3): World-class multilingual speech recognition with zero word drops, agricultural vocabulary biasing, and deep Indic accent understanding.
 2. Gnani Prisma v3 (api.vachana.ai/stt/v3): Native Sovereign Indic STT model.
+3. Anti-Urdu Unicode Firewall: Completely prevents any Arabic/Urdu script output.
 """
 
 import io
 import os
+import re
 import httpx
 import asyncio
 from typing import Optional, Dict, Any
 from app.config import settings
+
+# Unicode ranges covering Arabic, Urdu, Persian characters
+URDU_ARABIC_REGEX = re.compile(r'[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]')
 
 class SuperpoweredSTTService:
     def __init__(self):
@@ -44,20 +49,14 @@ class SuperpoweredSTTService:
             return "hi-IN"
         return "indic-auto"
 
-    def _normalize_whisper_lang(self, lang: str) -> Optional[str]:
+    def _normalize_whisper_lang(self, lang: str) -> str:
         """
         Maps Kisan-Vaani language codes to ISO-639-1 for Whisper Large v3.
-        For Hinglish/code-switching, returns None to allow multilingual auto-detection.
+        NEVER returns None or 'ur' - always forces either target Indic language, Hindi, or English!
         """
         l = (lang or "").lower().strip()
-        if "hinglish" in l:
-            return None
-        if "en" in l:
-            return "en"
         if "pa" in l:
             return "pa"
-        if "hi" in l:
-            return "hi"
         if "mr" in l:
             return "mr"
         if "te" in l:
@@ -68,7 +67,57 @@ class SuperpoweredSTTService:
             return "gu"
         if "bn" in l:
             return "bn"
-        return None
+        if "en" in l and "hi" not in l and "hinglish" not in l:
+            return "en"
+        # For Hindi, Hinglish, or any unspecified code: STRICTLY force "hi" (Hindi)
+        # Prevents Whisper's language detector from mistakenly selecting "ur" (Urdu)
+        return "hi"
+
+    async def _sanitize_anti_urdu(self, text: str) -> str:
+        """
+        Anti-Urdu Unicode Firewall:
+        If any Arabic/Perso-Arabic glyph is present in the transcript,
+        instantly transliterates/converts it to clean Hindi Devanagari or Latin text.
+        """
+        if not text or not URDU_ARABIC_REGEX.search(text):
+            return text
+
+        groq_key = self.groq_api_key or os.getenv("GROQ_API_KEY", "").strip() or settings.GROQ_API_KEY
+        if groq_key:
+            try:
+                async with httpx.AsyncClient(timeout=4.0) as client:
+                    res = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {groq_key.strip()}"},
+                        json={
+                            "model": "llama-3.3-70b-versatile",
+                            "messages": [
+                                {
+                                    "role": "system",
+                                    "content": (
+                                        "You are an Indic language normalizer for an Indian farmer app. "
+                                        "The user's speech was mistakenly transcribed in Urdu/Arabic script. "
+                                        "Convert this Urdu text into clean Hindi (Devanagari script or Hinglish Latin). "
+                                        "NEVER use Arabic or Urdu letters. Output ONLY the converted text."
+                                    )
+                                },
+                                {"role": "user", "content": text}
+                            ],
+                            "temperature": 0.0,
+                            "max_tokens": 120
+                        }
+                    )
+                    if res.status_code == 200:
+                        converted = res.json()["choices"][0]["message"]["content"].strip()
+                        if not URDU_ARABIC_REGEX.search(converted):
+                            print(f"[STT:AntiUrdu] Converted Urdu '{text}' -> Hindi '{converted}'")
+                            return converted
+            except Exception as e:
+                print(f"[STT:AntiUrdu] Conversion notice: {e}")
+
+        # Fallback safety: strip any Arabic/Urdu codepoints completely
+        cleaned = URDU_ARABIC_REGEX.sub('', text).strip()
+        return cleaned
 
     async def transcribe_with_whisper(self, audio_bytes: bytes, language: str = "en-IN") -> str:
         """
@@ -78,6 +127,8 @@ class SuperpoweredSTTService:
         groq_key = self.groq_api_key or os.getenv("GROQ_API_KEY", "").strip() or settings.GROQ_API_KEY
         if not groq_key or not audio_bytes or len(audio_bytes) < 400:
             return ""
+
+        w_lang = self._normalize_whisper_lang(language)
 
         headers = {
             "Authorization": f"Bearer {groq_key.strip()}"
@@ -90,13 +141,12 @@ class SuperpoweredSTTService:
             "prompt": (
                 "Kisan-Vaani Indian agricultural advisor. Mandi bhav, APMC rates, eNAM, quintal, "
                 "crop advisory, gehun, pyaaz, tamatar, aloo, fasal, kisan, khad, urea, DAP, spray, "
-                "bhav, bhao, Lasalgaon, Azadpur, Indore, Vashi, mandi, price, yesterday, today."
+                "bhav, bhao, Lasalgaon, Azadpur, Indore, Vashi, mandi, price, yesterday, today, Mohali, Lalru, Hardaspur. "
+                "Transcribe in standard Hindi Devanagari or English Latin script only. Do NOT use Urdu script."
             ),
-            "temperature": "0.0"
+            "temperature": "0.0",
+            "language": w_lang
         }
-        w_lang = self._normalize_whisper_lang(language)
-        if w_lang:
-            data["language"] = w_lang
 
         try:
             async with httpx.AsyncClient(timeout=8.0) as client:
@@ -108,12 +158,14 @@ class SuperpoweredSTTService:
                 )
                 if res.status_code == 200:
                     text = res.json().get("text", "").strip()
-                    # Filter out any hallucination on silent frames
                     lower_text = text.lower().strip(" .!?,")
                     if lower_text in ["thank you", "thanks", "bye", "you", "subtitles by", "amara.org", ""]:
                         return ""
-                    print(f"[SuperSTT:Whisper] Detected: '{text}' (lang={w_lang or 'auto'})")
-                    return text
+                    
+                    # Run through Anti-Urdu Firewall
+                    clean_text = await self._sanitize_anti_urdu(text)
+                    print(f"[SuperSTT:Whisper] Detected: '{clean_text}' (forced_lang={w_lang})")
+                    return clean_text
                 else:
                     print(f"[SuperSTT:Whisper] API error {res.status_code}: {res.text[:120]}")
         except Exception as e:
@@ -154,8 +206,9 @@ class SuperpoweredSTTService:
                     result = res.json()
                     transcript = (result.get("transcript") or result.get("text") or "").strip()
                     if transcript:
-                        print(f"[SuperSTT:GnaniPrisma] Detected: '{transcript}' (lang={gnani_lang})")
-                        return transcript
+                        clean_text = await self._sanitize_anti_urdu(transcript)
+                        print(f"[SuperSTT:GnaniPrisma] Detected: '{clean_text}' (lang={gnani_lang})")
+                        return clean_text
                 else:
                     print(f"[SuperSTT:GnaniPrisma] Status {res.status_code}: {res.text[:120]}")
         except Exception as e:
@@ -172,7 +225,7 @@ class SuperpoweredSTTService:
         """
         Concurrent Dual-Engine Ensemble:
         Runs Whisper Large v3 and Gnani Prisma concurrently.
-        Chooses the most complete, highest-accuracy transcription.
+        Guarantees zero Urdu text output and picks the most complete transcript.
         """
         if not audio_bytes or len(audio_bytes) < 300:
             return ""
@@ -186,11 +239,11 @@ class SuperpoweredSTTService:
         whisper_text = results[0] if isinstance(results[0], str) else ""
         gnani_text = results[1] if isinstance(results[1], str) else ""
 
-        # Priority 1: Whisper Large v3 (unsurpassed accuracy for multi-word full sentences & accents)
+        # Priority 1: Whisper Large v3
         if whisper_text and len(whisper_text.strip()) > 1:
             return whisper_text.strip()
 
-        # Priority 2: Gnani Prisma v3 Indic transcript
+        # Priority 2: Gnani Prisma v3
         if gnani_text and len(gnani_text.strip()) > 1:
             return gnani_text.strip()
 

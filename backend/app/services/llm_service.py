@@ -163,7 +163,11 @@ class LLMService:
             f"   • Speak naturally, empathetically, and conversationally, like an expert agricultural scientist talking to a farmer friend.\n"
             f"   • If given verified real-time data in the context block above, seamlessly weave those exact rates, mandi names, and chemical dosages into your explanation.\n"
             f"   • If the user's crop symptom is vague (e.g. 'crops are drying' or 'tamatar kharab ho rahe hai'), ask a smart diagnostic clarifying question before prescribing chemicals.\n"
-            f"   • Keep the length concise (2 to 4 spoken sentences) because your response is converted directly to voice audio via Gnani Timbre TTS. No markdown formatting, no emojis, no asterisks."
+            f"   • Keep the length concise (2 to 4 spoken sentences) because your response is converted directly to voice audio via Gnani Timbre TTS. No markdown formatting, no emojis, no asterisks.\n\n"
+            f"4. ABSOLUTE LOCATION FIDELITY (ZERO HALLUCINATIONS):\n"
+            f"   • Farmer {f_name}'s verified GPS home location is {loc_str}. All distance and nearest mandi calculations must be measured strictly relative to {loc_str}.\n"
+            f"   • You are strictly FORBIDDEN from inventing or hallucinating fictional place names (such as Mirigubadao or any imaginary place). If stating distance, reference {loc_str} directly.\n"
+            f"   • If the user explicitly asks about another mandi (e.g. 'Azadpur' or 'Lasalgaon'), answer for that specific mandi without changing their home village {loc_str}."
         )
 
     async def generate_response(

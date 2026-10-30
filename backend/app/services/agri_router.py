@@ -201,6 +201,28 @@ class AgriAgentRouter:
         f_name = getattr(session, "farmer_name", "Kisan Bhai") or "Kisan Bhai"
         pref_lang = getattr(session, "language", "en-US") or "en-US"
 
+        # Hydrate farmer profile location (Hardaspur, Punjab) if not yet loaded in session
+        if getattr(session, "phone_number", None) and (not getattr(session, "location_name", None) or session.location_name in ["Punjab", "India"]):
+            from app.services.farmer_db import farmer_db
+            farmer = farmer_db.get_farmer(session.phone_number)
+            if farmer:
+                if farmer.get("name") and farmer["name"] != "Kisan Bhai":
+                    session.farmer_name = farmer["name"]
+                    f_name = farmer["name"]
+                if farmer.get("village"): session.location_name = farmer["village"]
+                if farmer.get("district"): session.district = farmer["district"]
+                if farmer.get("state"): session.state = farmer["state"]
+                if farmer.get("latitude"): session.lat = float(farmer["latitude"])
+                if farmer.get("longitude"): session.lon = float(farmer["longitude"])
+
+        # Default fallback for Hardaspur if missing
+        if not getattr(session, "location_name", None):
+            session.location_name = "Hardaspur"
+            session.district = "Patiala"
+            session.state = "Punjab"
+            session.lat = 30.34
+            session.lon = 76.38
+
         # Step 1: Semantic Intent & Entity Extraction
         parsed = await self._parse_semantic_intent(raw_text, session)
         intent = parsed.get("intent", "CHITCHAT")
