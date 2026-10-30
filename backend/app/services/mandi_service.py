@@ -80,6 +80,28 @@ MANDI_COORDINATES = {
     "ludhiana": (30.9010, 75.8573),
     "jalandhar": (31.3260, 75.5762),
     "amritsar": (31.6340, 74.8723),
+    "rayya": (31.5414, 75.2312),
+    "lalru": (30.4867, 76.8369),
+    "mohali": (30.7046, 76.7179),
+    "sas nagar": (30.7046, 76.7179),
+    "phagwara": (31.2240, 75.7708),
+    "kapurthala": (31.3800, 75.3800),
+    "patiala": (30.3398, 76.3869),
+    "dera bassi": (30.5964, 76.8433),
+    "kharar": (30.7441, 76.6466),
+    "samrala": (30.8335, 76.1896),
+    "batala": (31.8186, 75.2028),
+    "dasuya": (31.8156, 75.6583),
+    "ahmedgarh": (30.6844, 75.8278),
+    "chamkaur sahib": (30.8879, 76.4258),
+    "bhagta bhai ka": (30.4439, 75.1219),
+    "bathinda": (30.2110, 74.9455),
+    "fazilka": (30.4036, 74.0255),
+    "gurdaspur": (32.0419, 75.4053),
+    "hoshiarpur": (31.5273, 75.9142),
+    "sangrur": (30.2458, 75.8421),
+    "ropar": (30.9664, 76.5331),
+    "rupnagar": (30.9664, 76.5331),
     "karnal": (29.6857, 76.9905),
     "sonipat": (28.9931, 77.0151),
     "ganaur": (29.1314, 77.0194),
@@ -303,17 +325,22 @@ class MandiService:
         return []
 
     def _resolve_coordinates(self, market_name: str, district: str, state: str = "") -> tuple[float, float]:
-        """Resolves accurate GPS coordinates for Indian mandis, falling back to state centroids."""
+        """Resolves accurate GPS coordinates for Indian mandis, prioritizing specific market over district."""
         m_lower = market_name.lower()
         d_lower = district.lower()
         s_lower = state.lower()
 
-        # 1. Exact or partial market match
+        # 1. Exact or partial market match FIRST (e.g. 'rayya' before 'amritsar')
         for k, coords in MANDI_COORDINATES.items():
-            if k in m_lower or k in d_lower:
+            if k in m_lower:
                 return coords
 
-        # 2. State centroid fallback
+        # 2. District match fallback
+        for k, coords in MANDI_COORDINATES.items():
+            if k in d_lower:
+                return coords
+
+        # 3. State centroid fallback
         for st_key, coords in STATE_CENTROIDS.items():
             if st_key in s_lower or st_key in d_lower:
                 return coords

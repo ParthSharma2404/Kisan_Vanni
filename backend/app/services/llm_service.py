@@ -478,25 +478,48 @@ class LLMService:
             f"You are a specialized agricultural translation system for Indian farmers.\n"
             f"Translate the provided conversation turns into natural, conversational {lang_name}.\n\n"
             f"CRITICAL RULES:\n"
-            f"1. PRESERVE NUMBERS & MONETARY AMOUNTS: Do not change any numbers, prices (₹ symbol), weights, or distances (e.g. ₹2,461, ₹2,422, 10 qtl, 56.3km must remain exact).\n"
-            f"2. PRESERVE NAMES: Mandi names (e.g. Sidhwan Bet APMC, Jalalabad, Abohar, Azadpur) and district names must be accurately preserved or phonetically transliterated.\n"
-            f"3. PRESERVE TECHNICAL/CHEMICAL TERMS: Terms like eNAM, MSP, quintal, Mancozeb 75 WP, etc. must remain clear and understandable.\n"
+            f"1. PRESERVE NUMBERS & MONETARY AMOUNTS: Do not change any numbers, prices (₹ symbol), weights, or distances (e.g. ₹2,461, ₹4,000, 10 qtl, 56.3km must remain exact).\n"
+            f"2. PRESERVE NAMES: Mandi names (e.g. Sidhwan Bet APMC, Lalru APMC, Rayya APMC, Azadpur) and district names must be accurately preserved or phonetically transliterated.\n"
+            f"3. PRESERVE TECHNICAL/CHEMICAL TERMS: Terms like eNAM, MSP, quintal, NPK, Mancozeb 75 WP, etc. must remain clear and understandable.\n"
             f"4. NATURAL VERNACULAR: Translate into fluent, friendly spoken agricultural phrasing suited for farmers.\n"
             f"5. RETURN ONLY VALID JSON: Return a JSON array matching the exact structure:\n"
-            f'[\n  {{"id": 0, "text": "translated text here"}},\n  {{"id": 1, "text": "translated text here"}}\n]\n'
+            '[\n  {"id": 0, "text": "translated text here"},\n  {"id": 1, "text": "translated text here"}\n]\n'
             f"Do NOT include markdown backticks or explanation. Return ONLY valid JSON array."
         )
 
         compact_turns = [{"id": t.get("id", i), "role": t.get("role", "user"), "text": t.get("text") or t.get("content", "")} for i, t in enumerate(turns)]
         user_content = json.dumps(compact_turns, ensure_ascii=False)
 
-        # 1. Try Groq (Fastest: <500ms)
+        def _extract_json_turns(raw_text: str) -> List[Dict[str, Any]]:
+            """Robust parser that extracts JSON arrays even if formatted with markdown or unescaped characters."""
+            if not raw_text:
+                return []
+            clean = re.sub(r"^```(?:json)?\s*", "", raw_text.strip())
+            clean = re.sub(r"\s*```$", "", clean).strip()
+            
+            m = re.search(r'\[\s*\{.*\}\s*\]', clean, re.DOTALL)
+            if m:
+                try:
+                    parsed = json.loads(m.group(0))
+                    if isinstance(parsed, list) and len(parsed) > 0:
+                        return parsed
+                except Exception:
+                    pass
+
+            objs = []
+            pattern = re.compile(r'\{\s*"id"\s*:\s*(\d+)\s*,\s*"text"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}', re.DOTALL)
+            for match in pattern.finditer(raw_text):
+                clean_t = match.group(2).replace(r'\"', '"').replace(r'\n', '\n')
+                objs.append({"id": int(match.group(1)), "text": clean_t})
+            return objs
+
+        # 1. Try Groq (Fast & High Accuracy: qwen specialized for Indic + gpt-oss fallback)
         groq_key = self.groq_api_key or settings.GROQ_API_KEY
         if groq_key:
             candidate_models = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
             for model_id in candidate_models:
                 try:
-                    async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
+                    async with httpx.AsyncClient(timeout=25.0, verify=False) as client:
                         res = await client.post(
                             "https://api.groq.com/openai/v1/chat/completions",
                             headers={
@@ -509,26 +532,25 @@ class LLMService:
                                     {"role": "system", "content": prompt},
                                     {"role": "user", "content": user_content}
                                 ],
-                                "temperature": 0.2,
-                                "max_tokens": 1200
+                                "temperature": 0.1,
+                                "max_tokens": 3500
                             }
                         )
                         if res.status_code == 200:
                             content = res.json()["choices"][0]["message"]["content"].strip()
-                            clean_json = re.sub(r"^```(?:json)?\s*", "", content)
-                            clean_json = re.sub(r"\s*```$", "", clean_json).strip()
-                            parsed = json.loads(clean_json)
-                            if isinstance(parsed, list) and len(parsed) > 0:
+                            parsed = _extract_json_turns(content)
+                            if parsed and len(parsed) >= len(compact_turns):
+                                print(f"[LLM:Translate:Groq] Successfully translated all {len(parsed)} turns using {model_id} to {target_language}")
                                 return parsed
                 except Exception as e:
                     print(f"[LLM:Translate:Groq] Model {model_id} notice: {e}")
 
-        # 2. Try Gemini
+        # 2. Try Gemini (if configured)
         gemini_key = self.gemini_api_key or settings.GEMINI_API_KEY
         if gemini_key:
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
-                async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+                async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
                     res = await client.post(
                         url,
                         headers={"Content-Type": "application/json"},
@@ -536,20 +558,19 @@ class LLMService:
                             "contents": [
                                 {"role": "user", "parts": [{"text": f"{prompt}\n\nINPUT TURNS:\n{user_content}"}]}
                             ],
-                            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1200}
+                            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 3500}
                         }
                     )
                     if res.status_code == 200:
                         content = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-                        clean_json = re.sub(r"^```(?:json)?\s*", "", content)
-                        clean_json = re.sub(r"\s*```$", "", clean_json).strip()
-                        parsed = json.loads(clean_json)
-                        if isinstance(parsed, list) and len(parsed) > 0:
+                        parsed = _extract_json_turns(content)
+                        if parsed and len(parsed) >= len(compact_turns):
+                            print(f"[LLM:Translate:Gemini] Translated {len(parsed)} turns to {target_language}")
                             return parsed
             except Exception as e:
                 print(f"[LLM:Translate:Gemini] Notice: {e}")
 
-        # 3. High-Speed Direct Neural Web Translation (Zero Failure, <200ms)
+        # 3. High-Reliability Neural Web Fallback (MyMemory API, Zero 429 Blocks)
         target_lang_code = {
             "en-US": "en", "en-IN": "en", "en": "en",
             "hi-IN": "hi", "hi": "hi", "hinglish": "hi",
@@ -565,16 +586,15 @@ class LLMService:
             if not text_to_trans or not text_to_trans.strip():
                 return text_to_trans
             try:
-                url = "https://translate.googleapis.com/translate_a/single"
-                params = {"client": "gtx", "sl": "auto", "tl": target_lang_code, "dt": "t", "q": text_to_trans}
-                r = await client.get(url, params=params, timeout=5.0)
+                url = "https://api.mymemory.translated.net/get"
+                params = {"q": text_to_trans[:500], "langpair": f"en|{target_lang_code}"}
+                r = await client.get(url, params=params, timeout=6.0)
                 if r.status_code == 200:
-                    data = r.json()
-                    parts = [p[0] for p in data[0] if p and p[0]]
-                    if parts:
-                        return "".join(parts)
+                    t = r.json().get("responseData", {}).get("translatedText")
+                    if t:
+                        return t
             except Exception as ex:
-                print(f"[LLM:Translate:Web] Sub-call notice: {ex}")
+                print(f"[LLM:Translate:MyMemory] Sub-call notice: {ex}")
             return text_to_trans
 
         try:

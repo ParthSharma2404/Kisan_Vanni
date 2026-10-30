@@ -87,8 +87,8 @@ const skeletonFeed = document.getElementById("skeletonFeed");
 
 let activeFarmerName = localStorage.getItem("kisan_auth_name") || "Parth";
 let activeLocation = localStorage.getItem("kisan_auth_location") || "Hardaspur, Punjab";
-let activeLat = parseFloat(localStorage.getItem("kisan_lat") || "30.3398");
-let activeLon = parseFloat(localStorage.getItem("kisan_lon") || "76.3869");
+let activeLat = parseFloat(localStorage.getItem("kisan_lat") || "31.2240");
+let activeLon = parseFloat(localStorage.getItem("kisan_lon") || "75.7708");
 
 // Strict Anti-Urdu Unicode Firewall (Arabic/Urdu script blocks)
 const URDU_ARABIC_REGEX = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/g;
@@ -321,18 +321,24 @@ async function transitionConversationLanguage(targetLang) {
   showLanguageToast(`Translating conversation to ${langLabel}...`);
   rows.forEach(r => r.classList.add("translating"));
 
-  // Read existing history to retain timestamps and rich widgets metadata (extra)
+  // Read existing history to retain timestamps, clean original texts, and rich widgets metadata (extra)
   let history = [];
   try {
     const raw = localStorage.getItem(storageKey);
     if (raw) history = JSON.parse(raw);
   } catch(e) { history = []; }
 
-  // Extract turn texts directly from the DOM elements
+  // Extract turn texts directly from clean stored history if available, else from visible DOM elements
   const turnsPayload = rows.map((r, i) => {
-    const isUser = r.classList.contains("user-row");
+    let isUser = r.classList.contains("user-row");
     let text = "";
-    if (isUser) {
+    let extra = {};
+
+    if (history[i] && history[i].text) {
+      isUser = history[i].role === "user";
+      text = history[i].text.trim();
+      extra = history[i].extra || {};
+    } else if (isUser) {
       const bubble = r.querySelector(".user-bubble");
       text = bubble ? bubble.innerText.trim() : r.innerText.trim();
     } else {
@@ -348,7 +354,6 @@ async function transitionConversationLanguage(targetLang) {
         }
       }
     }
-    const extra = (history[i] && history[i].extra) ? history[i].extra : {};
     return {
       id: i,
       role: isUser ? "user" : "assistant",
@@ -443,8 +448,8 @@ function initSessionAndStorage() {
   activePhone = savedPhone;
   activeFarmerName = localStorage.getItem("kisan_auth_name") || "Parth";
   activeLocation = savedLoc || "Hardaspur, Punjab";
-  activeLat = parseFloat(localStorage.getItem("kisan_lat") || "30.3398");
-  activeLon = parseFloat(localStorage.getItem("kisan_lon") || "76.3869");
+  activeLat = parseFloat(localStorage.getItem("kisan_lat") || "31.2240");
+  activeLon = parseFloat(localStorage.getItem("kisan_lon") || "75.7708");
   sessionId = `call_${activePhone}_${todayKey.replace(/-/g, '')}`;
 
   if (topUserPhoneText) topUserPhoneText.innerText = `+91 ${activePhone}`;
@@ -1496,8 +1501,6 @@ function stopRecordingAndSend() {
   reader.readAsDataURL(wavBlob);
   audioBufferChunks = [];
 }
-  audioBufferChunks = [];
-}
 
 // Resamples any input sample rate (e.g. 48000 or 44100 from browser AudioContext) to pristine 16000 Hz mono
 function resampleTo16k(chunks, sourceRate) {
@@ -1722,12 +1725,12 @@ document.addEventListener("DOMContentLoaded", () => {
           (err) => {
             console.warn("[GPS] Fallback to Hardaspur:", err);
             activeLocation = "Hardaspur, Punjab";
-            activeLat = 30.3398;
-            activeLon = 76.3869;
+            activeLat = 31.2240;
+            activeLon = 75.7708;
             localStorage.setItem("kisan_auth_location", activeLocation);
             localStorage.setItem("kisan_lat", activeLat);
             localStorage.setItem("kisan_lon", activeLon);
-            if (permLocationDesc) permLocationDesc.innerText = "✓ Verified: Hardaspur, Punjab";
+            if (permLocationDesc) permLocationDesc.innerText = "✓ Default: Hardaspur, Punjab";
             btnAllowLocation.innerText = "✓ Set";
             btnAllowLocation.classList.add("granted");
             if (permLocationCard) permLocationCard.classList.add("granted");
@@ -1736,8 +1739,12 @@ document.addEventListener("DOMContentLoaded", () => {
         );
       } else {
         activeLocation = "Hardaspur, Punjab";
+        activeLat = 31.2240;
+        activeLon = 75.7708;
         localStorage.setItem("kisan_auth_location", activeLocation);
-        if (permLocationDesc) permLocationDesc.innerText = "✓ Verified: Hardaspur, Punjab";
+        localStorage.setItem("kisan_lat", activeLat);
+        localStorage.setItem("kisan_lon", activeLon);
+        if (permLocationDesc) permLocationDesc.innerText = "✓ Default: Hardaspur, Punjab";
         btnAllowLocation.innerText = "✓ Set";
         btnAllowLocation.classList.add("granted");
         if (permLocationCard) permLocationCard.classList.add("granted");
@@ -1773,8 +1780,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const name = loginNameInput && loginNameInput.value.trim() ? loginNameInput.value.trim() : "Parth";
       if (!activeLocation) {
         activeLocation = "Hardaspur, Punjab";
-        activeLat = 30.3398;
-        activeLon = 76.3869;
+        activeLat = 31.2240;
+        activeLon = 75.7708;
       }
 
       localStorage.setItem("kisan_auth_phone", phone);

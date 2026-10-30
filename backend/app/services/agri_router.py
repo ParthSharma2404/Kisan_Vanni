@@ -215,13 +215,13 @@ class AgriAgentRouter:
                 if farmer.get("latitude"): session.lat = float(farmer["latitude"])
                 if farmer.get("longitude"): session.lon = float(farmer["longitude"])
 
-        # Default fallback for Hardaspur if missing
+        # Default fallback for Hardaspur (Phagwara, Kapurthala District, Punjab) if missing
         if not getattr(session, "location_name", None):
             session.location_name = "Hardaspur"
-            session.district = "Patiala"
+            session.district = "Kapurthala"
             session.state = "Punjab"
-            session.lat = 30.34
-            session.lon = 76.38
+            session.lat = 31.2240
+            session.lon = 75.7708
 
         # Step 1: Semantic Intent & Entity Extraction
         parsed = await self._parse_semantic_intent(raw_text, session)

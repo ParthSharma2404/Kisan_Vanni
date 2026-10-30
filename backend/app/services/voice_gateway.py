@@ -60,7 +60,7 @@ class VoiceGatewaySession:
 
         if farmer:
             dm_session.farmer_name = farmer.get("name", "Kisan Bhai")
-            dm_session.district = farmer.get("district") or "Patiala"
+            dm_session.district = farmer.get("district") or "Kapurthala"
             dm_session.state = farmer.get("state") or "Punjab"
             dm_session.location_name = farmer.get("village") or "Hardaspur"
             if farmer.get("latitude"): dm_session.lat = float(farmer["latitude"])
@@ -69,10 +69,10 @@ class VoiceGatewaySession:
         else:
             dm_session.farmer_name = data.get("farmer_name") or "Parth"
             dm_session.location_name = data.get("location") or "Hardaspur"
-            dm_session.district = "Patiala"
+            dm_session.district = "Kapurthala"
             dm_session.state = "Punjab"
-            dm_session.lat = float(data.get("latitude", 30.3398))
-            dm_session.lon = float(data.get("longitude", 76.3869))
+            dm_session.lat = float(data.get("latitude", 31.2240))
+            dm_session.lon = float(data.get("longitude", 75.7708))
             dm_session.step = "ACTIVE"
             if self.phone_number:
                 try:
