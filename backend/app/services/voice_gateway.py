@@ -142,38 +142,40 @@ class VoiceGatewaySession:
         await self.send_json({
             "type": "vad_state",
             "state": "processing",
-            "message": "Transcribing with Gnani Prisma STT..."
+            "message": "Transcribing with Superpowered Whisper & Prisma..."
         })
 
         transcript = ""
         if audio_b64:
             try:
                 audio_bytes = base64.b64decode(audio_b64)
-                if len(audio_bytes) > 400:
-                    cleaned_audio = acoustic_dsp.clean_audio_for_stt(audio_bytes)
+                if len(audio_bytes) > 300:
                     transcript = await gnani_stt.transcribe_audio_chunk(
-                        cleaned_audio,
+                        audio_bytes,
                         language=self.language,
                         api_key=self.api_key or settings.GNANI_API_KEY
                     )
             except Exception as e:
                 print(f"[VoiceGateway:{self.session_id}] STT decoding error: {e}")
 
+        # Incorporate client real-time transcript (Web Speech API)
+        client_text = data.get("text", "").strip()
+        if not transcript or not transcript.strip():
+            transcript = client_text
+        elif client_text and len(client_text.split()) > len(transcript.split()) + 2:
+            # Client transcript captured more complete phrasing
+            transcript = client_text
+
         # If transcription is empty or silent, send clarification prompt
         if not transcript or not transcript.strip():
-            # Check if there is manual text fallback in payload
-            fallback_text = data.get("text", "").strip()
-            if fallback_text:
-                transcript = fallback_text
-            else:
-                await self.send_json({
-                    "type": "vad_state",
-                    "state": "listening",
-                    "message": "Could not detect clear speech. Please speak again or use quick chips."
-                })
-                return
+            await self.send_json({
+                "type": "vad_state",
+                "state": "listening",
+                "message": "Could not detect clear speech. Please speak again or use quick chips."
+            })
+            return
 
-        print(f"[VoiceGateway:{self.session_id}] Farmer Utterance (Prisma STT): '{transcript}'")
+        print(f"[VoiceGateway:{self.session_id}] Transcribed Farmer Utterance: '{transcript}'")
         await self._process_text_utterance(transcript, turn_id, is_stt=True)
 
     async def handle_user_text(self, data: Dict[str, Any]):

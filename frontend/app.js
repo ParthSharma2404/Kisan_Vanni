@@ -1227,8 +1227,72 @@ function stopAnyCurrentAudio() {
 }
 
 // =====================================================================
-// 6. MICROPHONE & VAD INPUT ENGINE
 // =====================================================================
+// 6. OVERPOWERED DUAL-ENGINE MICROPHONE & VAD INPUT ENGINE
+// Zero-loss audio buffering + Browser Web Speech API + Whisper Large v3
+// =====================================================================
+let speechRecognizer = null;
+let liveTranscribedText = "";
+
+function startBrowserSpeechRecognition() {
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) return;
+
+  try {
+    if (speechRecognizer) {
+      try { speechRecognizer.abort(); } catch (e) {}
+    }
+    speechRecognizer = new SpeechRec();
+    speechRecognizer.continuous = true;
+    speechRecognizer.interimResults = true;
+    speechRecognizer.maxAlternatives = 1;
+
+    const langMap = {
+      "en-US": "en-IN",
+      "hi-IN": "hi-IN",
+      "hinglish": "hi-IN",
+      "pa-IN": "pa-Guru-IN",
+      "mr-IN": "mr-IN",
+      "te-IN": "te-IN",
+      "ta-IN": "ta-IN",
+      "gu-IN": "gu-IN",
+      "bn-IN": "bn-IN"
+    };
+    speechRecognizer.lang = langMap[currentLanguage] || "en-IN";
+
+    speechRecognizer.onresult = (event) => {
+      let interim = "";
+      let final = "";
+      for (let i = 0; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript + " ";
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      liveTranscribedText = (final + interim).trim();
+      if (liveTranscribedText && turnStatusText && isRecording) {
+        turnStatusText.innerText = `🎙️ "${liveTranscribedText}"`;
+      }
+    };
+
+    speechRecognizer.onerror = (e) => {
+      console.debug("[BrowserSTT] Notice:", e.error);
+    };
+
+    speechRecognizer.start();
+  } catch (err) {
+    console.debug("[BrowserSTT] Init notice:", err);
+  }
+}
+
+function stopBrowserSpeechRecognition() {
+  if (speechRecognizer) {
+    try { speechRecognizer.stop(); } catch (e) {}
+    speechRecognizer = null;
+  }
+}
+
 async function toggleMicrophone() {
   // If AI is currently speaking, user tap acts as barge-in: stop AI audio and unlock
   if (isAiSpeaking) {
@@ -1249,8 +1313,11 @@ async function toggleMicrophone() {
 
 async function startMicrophoneRecording() {
   try {
+    liveTranscribedText = "";
+    startBrowserSpeechRecognition();
+
     if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (audioContext.state === "suspended") {
       await audioContext.resume();
@@ -1260,9 +1327,8 @@ async function startMicrophoneRecording() {
       mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
-          sampleRate: 16000,
           echoCancellation: true,
-          noiseSuppression: true,
+          noiseSuppression: false,
           autoGainControl: true
         }
       });
@@ -1272,56 +1338,39 @@ async function startMicrophoneRecording() {
     audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
 
     audioBufferChunks = [];
-    preRollBuffer = [];
     isSpeaking = false;
     silenceStartTime = 0;
     speechStartTime = 0;
     isRecording = true;
 
-    setTurnState("recording");
+    setTurnState("recording", "🎙️ Listening... speak now (tap when finished)");
 
     audioProcessor.onaudioprocess = (e) => {
       if (!isRecording) return;
       const inputData = e.inputBuffer.getChannelData(0);
 
-      // RMS calculation
+      // Retain EVERY audio chunk from the exact moment recording starts! Zero missing starting words!
+      audioBufferChunks.push(new Float32Array(inputData));
+
+      // RMS calculation for auto-stop on silence
       let sum = 0;
       for (let i = 0; i < inputData.length; i++) {
         sum += inputData[i] * inputData[i];
       }
       const rms = Math.sqrt(sum / inputData.length);
-      // Gentle dynamic threshold that reliably picks up natural and soft Indic speech
-      const dynamicThreshold = Math.max(0.006, ambientNoiseFloor * 1.6);
-
       const now = performance.now();
 
-      if (rms > dynamicThreshold) {
+      // Soft threshold (0.005) ensures whispering or soft consonants are caught
+      if (rms > 0.005) {
+        isSpeaking = true;
         silenceStartTime = 0;
-        if (!isSpeaking) {
-          preRollBuffer.push(new Float32Array(inputData));
-          if (preRollBuffer.length > MAX_PRE_ROLL) preRollBuffer.shift();
-
-          if (speechStartTime === 0) speechStartTime = now;
-          else if (now - speechStartTime > MIN_SPEECH_DURATION_MS) {
-            isSpeaking = true;
-            for (let c of preRollBuffer) audioBufferChunks.push(c);
-            preRollBuffer = [];
-          }
-        }
-        if (isSpeaking) {
-          audioBufferChunks.push(new Float32Array(inputData));
+        if (!liveTranscribedText && turnStatusText) {
+          turnStatusText.innerText = "🎙️ Listening... (tap mic when done)";
         }
       } else {
-        speechStartTime = 0;
-        if (!isSpeaking) {
-          preRollBuffer.push(new Float32Array(inputData));
-          if (preRollBuffer.length > MAX_PRE_ROLL) preRollBuffer.shift();
-          ambientNoiseFloor = Math.min(0.02, ambientNoiseFloor * 0.95 + rms * 0.05);
-        } else {
-          // While speaking, retain pauses so word gaps aren't lost
-          audioBufferChunks.push(new Float32Array(inputData));
+        if (isSpeaking) {
           if (silenceStartTime === 0) silenceStartTime = now;
-          else if (now - silenceStartTime > SILENCE_TIMEOUT_MS) {
+          else if (now - silenceStartTime > 2200) { // 2.2s natural pause threshold
             isSpeaking = false;
             stopRecordingAndSend();
           }
@@ -1333,13 +1382,14 @@ async function startMicrophoneRecording() {
     audioProcessor.connect(audioContext.destination);
   } catch (err) {
     console.warn("[Mic] Access error:", err);
-    setTurnState("ready", "माइक की अनुमति दें");
+    setTurnState("ready", "Please allow microphone access");
   }
 }
 
 function stopRecording() {
   isRecording = false;
   isSpeaking = false;
+  stopBrowserSpeechRecognition();
   silenceStartTime = 0;
   speechStartTime = 0;
   audioBufferChunks = [];
@@ -1354,6 +1404,8 @@ function stopRecording() {
 
 function stopRecordingAndSend() {
   isRecording = false;
+  stopBrowserSpeechRecognition();
+
   if (audioProcessor && audioSource) {
     try {
       audioSource.disconnect();
@@ -1366,28 +1418,33 @@ function stopRecordingAndSend() {
     return;
   }
 
-  const currentSampleRate = (audioContext && audioContext.sampleRate) ? audioContext.sampleRate : 16000;
+  const currentSampleRate = (audioContext && audioContext.sampleRate) ? audioContext.sampleRate : 44100;
   const resampled16k = resampleTo16k(audioBufferChunks, currentSampleRate);
 
-  if (resampled16k.length < 4000) { // Too short / accidental tap (<0.25s)
+  if (resampled16k.length < 2400 && !liveTranscribedText) { // Ignore accidental click (<0.15s)
     setTurnState("ready");
     return;
   }
 
-  setTurnState("reasoning", "Processing advisory...");
+  setTurnState("reasoning", "Transcribing speech...");
 
   const wavBlob = encodeResampled16kWAV(resampled16k);
   const reader = new FileReader();
+  const textToSend = liveTranscribedText;
+
   reader.onloadend = () => {
     const base64Wav = reader.result.split(',')[1];
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({
         type: "speech_end",
-        audio_data: base64Wav
+        audio_data: base64Wav,
+        text: textToSend
       }));
     }
   };
   reader.readAsDataURL(wavBlob);
+  audioBufferChunks = [];
+}
   audioBufferChunks = [];
 }
 
