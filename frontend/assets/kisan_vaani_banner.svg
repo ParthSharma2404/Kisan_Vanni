@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c0e12" />
+      <stop offset="50%" stop-color="#12161c" />
+      <stop offset="100%" stop-color="#090b0e" />
+    </linearGradient>
+
+    <!-- Electric Volt Radial Glow -->
+    <radialGradient id="voltGlow" cx="50%" cy="45%" r="45%">
+      <stop offset="0%" stop-color="#c8ff2f" stop-opacity="0.22" />
+      <stop offset="60%" stop-color="#c8ff2f" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#c8ff2f" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Volt Accent Linear -->
+    <linearGradient id="voltLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c8ff2f" stop-opacity="0" />
+      <stop offset="30%" stop-color="#c8ff2f" stop-opacity="0.9" />
+      <stop offset="70%" stop-color="#a3e635" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#c8ff2f" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Topographic Grid Pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255, 255, 255, 0.03)" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="1200" height="420" fill="url(#bgGrad)" />
+  <rect width="1200" height="420" fill="url(#grid)" />
+
+  <!-- Ambient Volt Glow behind Logo -->
+  <circle cx="600" cy="175" r="260" fill="url(#voltGlow)" />
+
+  <!-- Topographic Curvature Lines -->
+  <path d="M -100 80 Q 250 20 600 110 T 1300 40" fill="none" stroke="rgba(200, 255, 47, 0.08)" stroke-width="1.5" />
+  <path d="M -100 140 Q 300 240 600 160 T 1300 120" fill="none" stroke="rgba(200, 255, 47, 0.06)" stroke-width="1.5" />
+  <path d="M -100 320 Q 350 210 600 290 T 1300 260" fill="none" stroke="rgba(255, 255, 255, 0.04)" stroke-width="1.5" />
+  <path d="M -100 380 Q 400 340 600 370 T 1300 330" fill="none" stroke="rgba(255, 255, 255, 0.03)" stroke-width="1.5" />
+
+  <!-- CENTER LOGO EMBLEM: Leaf & Voice Fusion (Electric Volt & Pure White) -->
+  <g transform="translate(600, 125)">
+    <!-- Outer Glow Ring -->
+    <circle cx="0" cy="0" r="52" fill="#161a22" stroke="rgba(200, 255, 47, 0.35)" stroke-width="2" />
+    <circle cx="0" cy="0" r="44" fill="#0f1217" stroke="rgba(200, 255, 47, 0.15)" stroke-width="1" />
+
+    <!-- Leaf Path (Left Wing) -->
+    <path d="M -6 18 C -22 14 -32 -2 -24 -24 C -16 -40 2 -32 4 -22 C -6 -12 -12 2 -6 18 Z" 
+          fill="#c8ff2f" />
+
+    <!-- Voice Soundwave / Leaf Ribs -->
+    <path d="M 2 -26 C 14 -20 22 -6 16 10 C 12 20 2 24 0 24" 
+          fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+
+    <!-- Microphone Capsule Core -->
+    <rect x="-7" y="-14" width="14" height="24" rx="7" fill="#ffffff" />
+    <path d="M -12 -3 C -12 8 12 8 12 -3" fill="none" stroke="#c8ff2f" stroke-width="2.5" stroke-linecap="round" />
+    <line x1="0" y1="9" x2="0" y2="17" stroke="#c8ff2f" stroke-width="2.5" stroke-linecap="round" />
+    <line x1="-5" y1="17" x2="5" y2="17" stroke="#c8ff2f" stroke-width="2.5" stroke-linecap="round" />
+
+    <!-- Acoustic Broadcast Waves -->
+    <path d="M 17 -16 A 14 14 0 0 1 17 12" fill="none" stroke="#c8ff2f" stroke-width="2.2" stroke-linecap="round" opacity="0.9" />
+    <path d="M 23 -22 A 22 22 0 0 1 23 18" fill="none" stroke="#c8ff2f" stroke-width="2.2" stroke-linecap="round" opacity="0.5" />
+    <path d="M -17 -16 A 14 14 0 0 0 -17 12" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" opacity="0.6" />
+  </g>
+
+  <!-- BRAND TYPOGRAPHY -->
+  <!-- Main Title: KISAN VAANI -->
+  <text x="600" y="240" 
+        font-family="'Plus Jakarta Sans', 'Segoe UI', -apple-system, sans-serif" 
+        font-size="44" 
+        font-weight="900" 
+        letter-spacing="9" 
+        fill="#ffffff" 
+        text-anchor="middle">
+    KISAN<tspan fill="#c8ff2f">·</tspan>VAANI
+  </text>
+
+  <!-- Indic Sub-Title -->
+  <text x="600" y="272" 
+        font-family="'Segoe UI', 'Noto Sans Devanagari', sans-serif" 
+        font-size="16" 
+        font-weight="600" 
+        letter-spacing="5" 
+        fill="#94a3b8" 
+        text-anchor="middle">
+    किसान-वाणी • SOVEREIGN FULL-DUPLEX KRISHI INTELLIGENCE
+  </text>
+
+  <!-- Divider Line -->
+  <rect x="350" y="295" width="500" height="1.5" fill="url(#voltLine)" />
+
+  <!-- Core Capability Pills (Clean badges below divider) -->
+  <g transform="translate(600, 335)" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-size="12" font-weight="700">
+    <!-- Pill 1: Mandi Arbitrage -->
+    <g transform="translate(-360, 0)">
+      <rect x="-85" y="-14" width="170" height="28" rx="14" fill="#161b22" stroke="rgba(200, 255, 47, 0.4)" stroke-width="1"/>
+      <circle cx="-65" cy="0" r="3.5" fill="#c8ff2f"/>
+      <text x="-52" y="4.5" fill="#e2e8f0" text-anchor="start">APMC Mandi Arbitrage</text>
+    </g>
+
+    <!-- Pill 2: Multimodal Scanner -->
+    <g transform="translate(-180, 0)">
+      <rect x="-85" y="-14" width="170" height="28" rx="14" fill="#161b22" stroke="rgba(200, 255, 47, 0.4)" stroke-width="1"/>
+      <circle cx="-65" cy="0" r="3.5" fill="#c8ff2f"/>
+      <text x="-52" y="4.5" fill="#e2e8f0" text-anchor="start">Multimodal Leaf Scanner</text>
+    </g>
+
+    <!-- Pill 3: Full-Spectrum Weather -->
+    <g transform="translate(0, 0)">
+      <rect x="-85" y="-14" width="170" height="28" rx="14" fill="#161b22" stroke="rgba(200, 255, 47, 0.4)" stroke-width="1"/>
+      <circle cx="-65" cy="0" r="3.5" fill="#c8ff2f"/>
+      <text x="-52" y="4.5" fill="#e2e8f0" text-anchor="start">Hyperlocal Agronomy</text>
+    </g>
+
+    <!-- Pill 4: Web RAG -->
+    <g transform="translate(180, 0)">
+      <rect x="-85" y="-14" width="170" height="28" rx="14" fill="#161b22" stroke="rgba(200, 255, 47, 0.4)" stroke-width="1"/>
+      <circle cx="-65" cy="0" r="3.5" fill="#c8ff2f"/>
+      <text x="-52" y="4.5" fill="#e2e8f0" text-anchor="start">Live Web RAG Engine</text>
+    </g>
+
+    <!-- Pill 5: eNAM 0% Rights -->
+    <g transform="translate(360, 0)">
+      <rect x="-85" y="-14" width="170" height="28" rx="14" fill="#161b22" stroke="rgba(200, 255, 47, 0.4)" stroke-width="1"/>
+      <circle cx="-65" cy="0" r="3.5" fill="#c8ff2f"/>
+      <text x="-52" y="4.5" fill="#e2e8f0" text-anchor="start">eNAM 0% Rights</text>
+    </g>
+  </g>
+
+  <!-- Tagline below pills -->
+  <text x="600" y="385" 
+        font-family="'Plus Jakarta Sans', sans-serif" 
+        font-size="12" 
+        font-weight="500" 
+        fill="#64748b" 
+        text-anchor="middle">
+    Powered by Gnani Timbre v3.0 • Gnani Prisma v3.0 • ICAR Scientific POP Grounding • Open-Meteo Sensor Grid
+  </text>
+</svg>
+
