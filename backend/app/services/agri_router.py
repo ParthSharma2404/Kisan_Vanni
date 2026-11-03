@@ -415,6 +415,32 @@ class AgriAgentRouter:
                 "enam_rules": "Statutory APMC law: Farmer commission is 0%. Buyer pays commission. Electronic weighbridge slip mandatory.",
                 "user_acknowledged_cost": user_ack_cost
             }
+
+            if evaluated:
+                top = evaluated[0]
+                context_data["top_recommended_mandi"] = {
+                    "mandi_name": top["mandi_name"],
+                    "district": top.get("district", ""),
+                    "modal_price": top["modal_price"],
+                    "distance_km": top["distance_km"],
+                    "gross_revenue": top["gross_revenue"],
+                    "freight_cost": top["freight_cost"],
+                    "net_in_hand": top["net_in_hand"],
+                    "net_rate_per_quintal": top["net_rate_per_quintal"],
+                    "is_viable": top.get("is_viable", True),
+                    "transport_mode": top.get("transport_mode", "")
+                }
+                if len(evaluated) > 1:
+                    runner_up = evaluated[1]
+                    extra_profit = round(top["net_in_hand"] - runner_up["net_in_hand"], 2)
+                    context_data["runner_up_comparison"] = {
+                        "mandi_name": runner_up["mandi_name"],
+                        "district": runner_up.get("district", ""),
+                        "distance_km": runner_up["distance_km"],
+                        "net_in_hand": runner_up["net_in_hand"],
+                        "extra_profit_in_top": extra_profit
+                    }
+
             if user_ack_cost:
                 context_data["anti_nagging_directive"] = (
                     "CRITICAL OVERRIDE: The farmer explicitly acknowledged that selling a small lot is not cost-effective, "

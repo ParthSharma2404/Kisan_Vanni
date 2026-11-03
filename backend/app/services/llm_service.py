@@ -137,6 +137,20 @@ class LLMService:
                 ctx_lines.append("CRITICAL INSTRUCTION: The farmer asked about rates for the crops previously discussed (e.g. 'inka daam'). Mention the live modal prices for EACH of these crops clearly from the verified data provided. Do NOT claim you only have data for another crop.")
             if "arbitrage" in context_data:
                 ctx_lines.append(f"EVALUATED ARBITRAGE & NET PROFIT: {json.dumps(context_data['arbitrage'], ensure_ascii=False)}")
+            if "top_recommended_mandi" in context_data:
+                top_m = context_data["top_recommended_mandi"]
+                ctx_lines.append(
+                    f"MATHEMATICAL ARBITRAGE WINNER (RANK #1 - UI HERO CARD DISPLAYS THIS MANDI): "
+                    f"{top_m['mandi_name']} ({top_m.get('district', '')}) | Net In-Hand: ₹{top_m['net_in_hand']} | "
+                    f"Modal Rate: ₹{top_m['modal_price']}/qtl | Distance: {top_m['distance_km']}km | Viable: {top_m.get('is_viable', True)}."
+                )
+            if "runner_up_comparison" in context_data:
+                rup = context_data["runner_up_comparison"]
+                ctx_lines.append(
+                    f"RUNNER-UP COMPARISON: {rup['mandi_name']} ({rup['distance_km']}km) yields Net ₹{rup['net_in_hand']}. "
+                    f"Rank #1 {context_data['top_recommended_mandi']['mandi_name']} yields ₹{rup['extra_profit_in_top']} MORE "
+                    f"net in-hand profit even after accounting for the travel distance difference."
+                )
             if "crop_disease_info" in context_data:
                 ctx_lines.append(f"ICAR SCIENTIFIC DISEASE & TREATMENT FACTS: {json.dumps(context_data['crop_disease_info'], ensure_ascii=False)}")
             if "enam_rules" in context_data:
@@ -190,7 +204,11 @@ class LLMService:
             f"   • In Indian APMC mandis, raw unhusked crop is traded as Paddy (Dhan / ਧਾਨ). Milled table rice (Chawal) is sold through retail grocery or wholesale millers. When a farmer inquires about selling 'rice' in an APMC, state the APMC Paddy modal rate (MSP ~₹2,320/qtl for common paddy, or ₹3,400-₹3,850/qtl for Basmati).\n\n"
             f"8. NATURAL STATUTORY eNAM PHRASING:\n"
             f"   • NEVER say awkward phrases like 'prevailing market rate minus zero percent commission'.\n"
-            f"   • Phrase this naturally and professionally: 'Under statutory eNAM rules, farmers pay 0% commission—the buyer pays all market fees.'"
+            f"   • Phrase this naturally and professionally: 'Under statutory eNAM rules, farmers pay 0% commission—the buyer pays all market fees.'\n\n"
+            f"9. STRICT ARBITRAGE ALIGNMENT (TEXT-TO-CARD 100% FIDELITY):\n"
+            f"   • When 'MATHEMATICAL ARBITRAGE WINNER (RANK #1)' is provided in the verified context data, your spoken advice MUST recommend that exact mandi as the primary option.\n"
+            f"   • NEVER contradict the visual card or recommend a runner-up mandi as 'more cost-effective'. The arbitrage engine has ALREADY deducted exact travel fuel/freight, APMC cess, and hamali from each candidate.\n"
+            f"   • If comparing with a closer runner-up mandi, explain clearly and accurately that while the runner-up is closer, the higher modal price at the top-ranked mandi covers the travel fuel and still yields higher net in-hand profit."
         )
 
     async def generate_response(
