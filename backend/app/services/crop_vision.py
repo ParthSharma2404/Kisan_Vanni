@@ -144,8 +144,8 @@ class CropVisionDiagnostician:
         # 1. Inspect image dimensions and chromatic spectrum
         img_stats = self._analyze_leaf_pixels(image_bytes)
 
-        # 2. Attempt LLM / Vision-assisted zero-shot matching if keys available
-        disease_key = await self._detect_disease_key(image_bytes, crop_hint, img_stats)
+        # 2. Attempt vision-assisted matching and pixel spectrum extraction
+        disease_key = self._detect_disease_key(image_bytes, crop_hint, img_stats)
 
         # 3. Retrieve verified ICAR Package of Practices (POP)
         diagnosis_data = ICAR_DISEASE_POP.get(disease_key, ICAR_DISEASE_POP["tomato_leaf_curl"])
@@ -176,9 +176,9 @@ class CropVisionDiagnostician:
         }
 
     def _analyze_leaf_pixels(self, image_bytes: bytes) -> Dict[str, Any]:
-        """Performs RGB color space feature extraction to evaluate powdery mildew, chlorosis, and necrosis."""
+        """Performs calibrated color-space feature extraction to evaluate powdery mildew, chlorosis, and necrosis."""
         if not HAS_PIL or Image is None:
-            return {"dimensions": "Unknown", "chlorosis_score": 15.0, "necrosis_score": 10.0, "powdery_score": 10.0}
+            return {"dimensions": "Unknown", "chlorosis_score": 15.0, "necrosis_score": 10.0, "powdery_score": 10.0, "green_score": 25.0}
         try:
             img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
             width, height = img.size
@@ -186,8 +186,8 @@ class CropVisionDiagnostician:
             thumb = img.resize((100, 100))
             raw_pixels = list(thumb.getdata())
 
-            # Exclude bright white canvas or UI borders if a screenshot is uploaded
-            pixels = [p for p in raw_pixels if not (p[0] > 240 and p[1] > 240 and p[2] > 240)]
+            # Exclude extreme border pixels (pure black <25 or pure white >248 from UI containers)
+            pixels = [p for p in raw_pixels if not (p[0] < 25 and p[1] < 25 and p[2] < 25) and not (p[0] > 248 and p[1] > 248 and p[2] > 248)]
             if not pixels:
                 pixels = raw_pixels
 
@@ -198,17 +198,22 @@ class CropVisionDiagnostician:
             green_foliage = 0
 
             for r, g, b in pixels:
-                # White/Gray powdery mildew mycelium (high brightness, low color saturation)
-                if r > 125 and g > 125 and b > 125 and abs(r - g) < 24 and abs(g - b) < 24:
+                brightness = (r + g + b) / 3.0
+                saturation = max(r, g, b) - min(r, g, b)
+
+                # 1. White/Gray powdery mildew mycelium:
+                # Characterized by high brightness (>90) with low saturation (silvery/gray/white)
+                # or cool fungal bloom under outdoor skylight (b >= r and b > 100)
+                if (brightness > 95 and saturation < 50) or (brightness > 90 and b >= r and b > 100):
                     white_powdery += 1
-                # Dark Brown/Black necrotic spots (target rings, leaf spots)
-                elif r < 115 and g < 100 and b < 85:
+                # 2. Dark Brown/Black necrotic spots (target rings, leaf spots)
+                elif r < 110 and g < 95 and b < 80 and (r >= b or abs(r - b) < 15):
                     brown_necrotic += 1
-                # Yellow / Chlorosis
-                elif r > 130 and g > 120 and b < 90:
+                # 3. Yellow Chlorosis / halo around lesions
+                elif r > 120 and g > 110 and b < 90 and (r > b + 25):
                     yellow_chlorotic += 1
-                # Green leaf tissue
-                elif g > r and g > b:
+                # 4. Healthy green foliage (chlorophyll)
+                elif g > r + 15 and g > b + 25:
                     green_foliage += 1
 
             return {
@@ -220,9 +225,9 @@ class CropVisionDiagnostician:
             }
         except Exception as e:
             print(f"[CropVision] Pixel extraction note: {e}")
-            return {"dimensions": "Unknown", "chlorosis_score": 15.0, "necrosis_score": 10.0, "powdery_score": 10.0}
+            return {"dimensions": "Unknown", "chlorosis_score": 15.0, "necrosis_score": 10.0, "powdery_score": 10.0, "green_score": 25.0}
 
-    async def _detect_disease_key(
+    def _detect_disease_key(
         self,
         image_bytes: bytes,
         crop_hint: Optional[str],
@@ -245,21 +250,22 @@ class CropVisionDiagnostician:
         powdery = img_stats.get("powdery_score", 0.0)
         necrotic = img_stats.get("necrosis_score", 0.0)
         chlorotic = img_stats.get("chlorosis_score", 0.0)
+        green = img_stats.get("green_score", 0.0)
 
-        # 1. Distinct Powdery Mildew: high white/ash fungal coating
-        if powdery >= 30.0 or (powdery > necrotic and powdery > chlorotic and powdery > 18.0):
+        # 1. Distinct Powdery Mildew: pervasive white/ash/silvery fungal coating
+        if powdery >= 25.0 or (powdery > necrotic and powdery > 15.0):
             return "powdery_mildew"
 
         # 2. Distinct Early Blight / Alternaria Necrotic Spots on green foliage
-        if necrotic >= 6.0 or (necrotic > chlorotic and necrotic > 2.0):
+        if (necrotic >= 5.0 and green >= 8.0) or (necrotic > powdery and necrotic > 10.0):
             return "tomato_early_blight"
 
         # 3. Yellow Leaf Curl: heavy upward chlorosis
-        if chlorotic > 15.0:
+        if chlorotic > 20.0:
             return "tomato_leaf_curl"
 
-        # Default to early blight if localized spots exist, otherwise general fungal pop
-        return "tomato_early_blight" if necrotic > powdery else "powdery_mildew"
+        # Fallback based on relative dominant pathology
+        return "powdery_mildew" if powdery > necrotic else "tomato_early_blight"
 
     def _generate_voice_summary(self, pop: Dict[str, Any], language: str) -> str:
         """Produces a concise voice-ready audio script for Gnani TTS."""
