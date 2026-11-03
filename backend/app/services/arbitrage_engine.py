@@ -30,33 +30,62 @@ class ArbitrageEngine:
             gross_revenue = modal_price * quantity_quintals
 
             # Transport Cost Calculation
+            # Micro-lots (< 100 kg / 1 quintal) realistically move via personal two-wheeler, bus, or shared auto for local distances
+            is_micro_lot = quantity_quintals < 1.0
+
             if already_at_mandi or distance_km < 1.0:
                 freight_cost = 0.0
+                transport_mode = "Local / Zero Distance"
             elif has_own_vehicle:
-                # Own vehicle (Bolero/Tractor): Only calculate diesel for round-trip
-                # Round-trip km = distance_km * 2
-                round_trip_km = distance_km * 2
-                freight_cost = round(round_trip_km * settings.DIESEL_COST_PER_KM, 2)
+                if is_micro_lot and distance_km <= 25.0:
+                    # Two-wheeler / personal scooter trip for small bag (10-50 kg)
+                    freight_cost = round(min(80.0, max(25.0, distance_km * 2 * 2.5)), 2)
+                    transport_mode = "Two-Wheeler / Personal Trip"
+                else:
+                    # Own vehicle (Bolero/Tractor): Only calculate diesel for round-trip
+                    round_trip_km = distance_km * 2
+                    freight_cost = round(round_trip_km * settings.DIESEL_COST_PER_KM, 2)
+                    transport_mode = "Own Vehicle (Diesel only)"
             else:
-                # Hired Tempo / Commercial freight
-                extra_km = max(0.0, distance_km - 10.0)
-                freight_cost = round(settings.BASE_FREIGHT_COST + (extra_km * settings.PER_KM_FREIGHT_RATE), 2)
+                if is_micro_lot and distance_km <= 15.0:
+                    # Shared auto or local bus parcel for micro-lot
+                    freight_cost = 40.0
+                    transport_mode = "Shared Auto / Local Transit"
+                else:
+                    # Hired Tempo / Commercial freight
+                    extra_km = max(0.0, distance_km - 10.0)
+                    freight_cost = round(settings.BASE_FREIGHT_COST + (extra_km * settings.PER_KM_FREIGHT_RATE), 2)
+                    transport_mode = "Hired Tempo"
 
             # Statutory Mandi Cess (percentage of gross)
             cess_pct = float(m.get("apmc_cess_pct", 1.0)) / 100.0
             mandi_cess = round(gross_revenue * cess_pct, 2)
 
-            # Hamali / Handling charges
+            # Hamali / Handling charges (statutory cap)
             hamali = round(settings.HAMALI_PER_QUINTAL * quantity_quintals, 2)
 
             # Total deductions
             total_expenses = freight_cost + mandi_cess + hamali
             net_in_hand = round(gross_revenue - total_expenses, 2)
-            net_rate_per_quintal = round(net_in_hand / quantity_quintals, 2)
+
+            # Viability Guardrail: Never blow up into absurd negative rates per quintal (e.g. -₹34,152/qtl)
+            if net_in_hand <= 0:
+                is_viable = False
+                viability_status = "UNVIABLE_HIGH_LOGISTICS"
+                net_rate_per_quintal = 0.0
+                deficit_amount = round(abs(net_in_hand), 2)
+                viability_reason = f"Logistics expense (₹{total_expenses:.0f}) exceeds total crop gross value (₹{gross_revenue:.0f}) for {quantity_quintals} qtl."
+            else:
+                is_viable = True
+                viability_status = "VIABLE"
+                net_rate_per_quintal = round(net_in_hand / quantity_quintals, 2)
+                deficit_amount = 0.0
+                viability_reason = "Profitable realization after logistics and statutory charges."
 
             evaluated.append({
                 "mandi_name": m["market"],
                 "district": m["district"],
+                "state": m.get("state", ""),
                 "modal_price": modal_price,
                 "distance_km": distance_km,
                 "gross_revenue": gross_revenue,
@@ -66,12 +95,20 @@ class ArbitrageEngine:
                 "total_expenses": total_expenses,
                 "net_in_hand": net_in_hand,
                 "net_rate_per_quintal": net_rate_per_quintal,
+                "is_viable": is_viable,
+                "viability_status": viability_status,
+                "deficit_amount": deficit_amount,
+                "viability_reason": viability_reason,
                 "is_arrival_surge": m.get("is_arrival_surge", False),
-                "transport_mode": "Own Vehicle (Diesel only)" if has_own_vehicle else "Hired Tempo"
+                "transport_mode": transport_mode
             })
 
-        # Sort by total net in-hand payout descending
-        evaluated.sort(key=lambda x: x["net_in_hand"], reverse=True)
+        # Sort: Viable mandis first sorted by net_in_hand descending,
+        # then unviable mandis sorted by distance_km ascending (closest first)
+        evaluated.sort(
+            key=lambda x: (1 if x["is_viable"] else 0, x["net_in_hand"] if x["is_viable"] else -x["distance_km"]),
+            reverse=True
+        )
         return evaluated
 
     def generate_verbal_reasoning(

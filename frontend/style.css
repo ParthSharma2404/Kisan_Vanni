@@ -769,6 +769,11 @@ html, body {
   letter-spacing: 0.2px;
 }
 
+.mandi-top-pill.mandi-warning-pill {
+  background: #dc2626;
+  color: #ffffff;
+}
+
 .mandi-hero-price-row {
   display: flex;
   align-items: baseline;
@@ -812,6 +817,17 @@ html, body {
 .mandi-stat-chip.emerald {
   background: var(--carbon-black);
   color: #ffffff;
+}
+
+.mandi-stat-chip.amber {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.mandi-compare-net.deficit-text {
+  color: #dc2626 !important;
+  font-weight: 600;
 }
 
 .mandi-stat-chip svg {

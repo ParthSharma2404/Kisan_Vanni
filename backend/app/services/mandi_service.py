@@ -85,6 +85,7 @@ MANDI_COORDINATES = {
     "mohali": (30.7046, 76.7179),
     "sas nagar": (30.7046, 76.7179),
     "phagwara": (31.2240, 75.7708),
+    "hardaspur": (31.2240, 75.7708),
     "kapurthala": (31.3800, 75.3800),
     "patiala": (30.3398, 76.3869),
     "dera bassi": (30.5964, 76.8433),
@@ -100,6 +101,10 @@ MANDI_COORDINATES = {
     "gurdaspur": (32.0419, 75.4053),
     "hoshiarpur": (31.5273, 75.9142),
     "sangrur": (30.2458, 75.8421),
+    "moga": (30.8165, 75.1717),
+    "faridkot": (30.6769, 74.7583),
+    "ferozepur": (30.9237, 74.6065),
+    "barnala": (30.3736, 75.5484),
     "ropar": (30.9664, 76.5331),
     "rupnagar": (30.9664, 76.5331),
     "karnal": (29.6857, 76.9905),
@@ -136,6 +141,9 @@ STATE_LOCATION_KEYWORDS = {
     "khanna": "Punjab", "ludhiana": "Punjab", "jalandhar": "Punjab", "amritsar": "Punjab", "patiala": "Punjab",
     "bathinda": "Punjab", "bhatinda": "Punjab", "fazilka": "Punjab", "gurdaspur": "Punjab", "batala": "Punjab",
     "hoshiarpur": "Punjab", "mohali": "Punjab", "sangrur": "Punjab", "ropar": "Punjab",
+    "kapurthala": "Punjab", "hardaspur": "Punjab", "phagwara": "Punjab", "rayya": "Punjab",
+    "moga": "Punjab", "faridkot": "Punjab", "ferozepur": "Punjab", "barnala": "Punjab",
+    "nawanshahr": "Punjab", "shahkot": "Punjab", "nakodar": "Punjab",
     
     # Haryana
     "haryana": "Haryana", "hariyana": "Haryana", "हरियाणा": "Haryana",
@@ -215,8 +223,9 @@ COMMODITY_ALIASES = {
     "tur": "Red gram/Arhar/Tur(whole)", "toor": "Red gram/Arhar/Tur(whole)", "arhar": "Red gram/Arhar/Tur(whole)",
     "pigeon pea": "Red gram/Arhar/Tur(whole)", "pigeon peas": "Red gram/Arhar/Tur(whole)", "red gram": "Red gram/Arhar/Tur(whole)",
     "तूर": "Red gram/Arhar/Tur(whole)", "अरहर": "Red gram/Arhar/Tur(whole)",
-    # Paddy / Rice
-    "paddy": "Paddy(Common)", "dhan": "Paddy(Common)", "धान": "Paddy(Common)", "chawal": "Rice", "rice": "Rice", "चावल": "Rice",
+    # Paddy / Rice (In APMC mandis, raw crop is traded as Paddy(Common) / Dhan)
+    "paddy": "Paddy(Common)", "dhan": "Paddy(Common)", "धान": "Paddy(Common)",
+    "chawal": "Paddy(Common)", "rice": "Paddy(Common)", "चावल": "Paddy(Common)",
     "basmati": "Paddy(Basmati)",
     # Chilli
     "chilli": "Green Chilli", "mirch": "Green Chilli", "mirchi": "Green Chilli", "मिर्च": "Green Chilli", "green chilli": "Green Chilli",
@@ -483,7 +492,11 @@ class MandiService:
 
         # 2. Process Agmarknet Benchmark Database Records
         # If target_state was explicitly requested, DO NOT leak records from unrelated states (e.g. Nashik)
-        norm_targets = {norm_comm, canonical_comm.lower(), canonical_comm.split('(')[0].strip().lower()}
+        if norm_comm in ["rice", "chawal", "चावल", "paddy", "dhan", "धान", "paddy(common)"]:
+            norm_targets = {"rice", "paddy", "paddy(common)", "paddy(basmati)"}
+        else:
+            norm_targets = {norm_comm, canonical_comm.lower(), canonical_comm.split('(')[0].strip().lower()}
+
         for item in self._local_cache:
             item_comm = item.get("commodity", "").lower()
             item_state = item.get("state", "")
@@ -514,11 +527,63 @@ class MandiService:
                     else:
                         other_results.append(entry)
 
-        # Combine results: Target location mandis first, followed by nearby mandis sorted by distance
-        matched_results.sort(key=lambda x: x.get("modal_price", 0), reverse=True)
+        # Sort matched results primarily by distance so the farmer is shown nearest viable mandis first
+        matched_results.sort(key=lambda x: x.get("distance_km", 9999))
         other_results.sort(key=lambda x: x.get("distance_km", 9999))
 
         final_rates = matched_results + other_results
         return final_rates[:8]
+
+    def get_nearby_apmc_directory(
+        self,
+        user_lat: float,
+        user_lon: float,
+        state: Optional[str] = "Punjab",
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Returns a verified, distance-calculated directory of APMC mandis in the state/region
+        relative to the farmer's GPS coordinates. Prevents LLM distance hallucinations.
+        """
+        directory = []
+        seen = set()
+        st_filter = (state or "").lower().strip()
+
+        for item in self._local_cache:
+            m_name = item.get("market", "")
+            dist_name = item.get("district", "")
+            st_name = item.get("state", "")
+            if st_filter and st_name.lower() != st_filter:
+                continue
+            
+            key = f"{m_name}_{dist_name}".lower()
+            if key in seen:
+                continue
+            seen.add(key)
+
+            m_lat = item.get("lat") or 0.0
+            m_lon = item.get("lon") or 0.0
+            if m_lat == 0.0:
+                m_lat, m_lon = self._resolve_coordinates(m_name, dist_name, st_name)
+            
+            dist = round(haversine_distance(user_lat, user_lon, m_lat, m_lon), 1) if (m_lat and m_lon) else 999.0
+            
+            # Find commodities available in this market from local cache
+            comms = sorted(list({
+                c.get("commodity", "") for c in self._local_cache 
+                if c.get("market") == m_name and c.get("state") == st_name
+            }))
+
+            directory.append({
+                "market": m_name,
+                "district": dist_name,
+                "state": st_name,
+                "distance_km": dist,
+                "commodities": comms,
+                "enam_active": item.get("enam_active", True)
+            })
+
+        directory.sort(key=lambda x: x["distance_km"])
+        return directory[:limit]
 
 mandi_service = MandiService()

@@ -23,7 +23,7 @@ from app.services.enam_rules import enam_advisor
 ROUTER_PARSER_PROMPT = """Analyze the farmer's raw speech in the context of recent chat history.
 Extract all agricultural entities into a strict JSON object:
 {
-  "intent": "MANDI_PRICE" | "CROP_HEALTH_DIAGNOSIS" | "QUANTITY_INPUT" | "WEATHER_AGRONOMY" | "GOV_SCHEME" | "DAILY_SUMMARY" | "CHITCHAT" | "OFF_TOPIC",
+  "intent": "MANDI_PRICE" | "APMC_DIRECTORY" | "CROP_HEALTH_DIAGNOSIS" | "QUANTITY_INPUT" | "WEATHER_AGRONOMY" | "GOV_SCHEME" | "DAILY_SUMMARY" | "CHITCHAT" | "OFF_TOPIC",
   "crop": "<crop_name_in_english_e.g._tomato|onion|potato|wheat|mustard|cotton|garlic|chilli|paddy|or_null>",
   "issue": "<disease_symptom_or_problem_e.g._fruit_rot|yellow_leaves|pest|spoilage|or_null>",
   "is_vague_symptom": <true|false>,
@@ -41,6 +41,8 @@ RULES:
 4. If asking for a summary/receipt/WhatsApp message, set intent = "DAILY_SUMMARY".
 5. If the user introduces themselves or states their name, extract farmer_name.
 6. PRONOUN & ANAPHORA RESOLUTION: If the user refers to crops using demonstrative pronouns ("inka", "iski", "iska", "inhe", "inko", "ye", "yeh", "in faslon", "unka", "inme se") or asks "mandi mai kitna daam mill sakta hai inka?", look at the immediately preceding assistant message in the chat history. Extract the crop or crops recommended or discussed there! If multiple crops are mentioned (e.g. soybean, cotton, groundnut), set crop to all of them separated by commas (e.g. "soybean,cotton,groundnut") and set intent = "MANDI_PRICE".
+7. APMC DIRECTORY & MANDI LOOKUP: If the user asks how many APMCs or mandis exist near their location, or asks for nearby mandis or top APMCs in their state (e.g. "near my location how many APMCs are present", "top 10 location of APMC in my state", "what about amritsar APMC"), set intent = "APMC_DIRECTORY".
+8. USER OVERRIDE & RE-ASKING PRICES: If the user acknowledges cost unviability ("i get that it wouldn't be cost effective... but still list the mandis and prices", "agar APMC me bechna ho toh mandi aur price batao"), set intent = "MANDI_PRICE" and preserve the discussed crop.
 Output valid JSON only. Do not wrap in markdown or backticks."""
 
 CROP_ALIASES = {
@@ -178,6 +180,14 @@ class AgriAgentRouter:
         if any(w in clean for w in ["kharab", "bimari", "keeda", "daag", "rog", "pila", "dawai", "spray", "sukh"]):
             return {"intent": "CROP_HEALTH_DIAGNOSIS", "crop": found_crop, "is_vague_symptom": "kharab" in clean or "dikkat" in clean}
 
+        # APMC Directory / Nearby Mandis Inquiry
+        if any(w in clean for w in ["how many apmc", "how many mandi", "nearby apmc", "near my loation", "near my location", "apmc in my state", "location of apmc", "what about amritsar", "kitne mandi", "kitni apmc"]):
+            return {"intent": "APMC_DIRECTORY", "crop": found_crop}
+
+        # Farmer Overriding Small-Lot Preaching
+        if any(w in clean for w in ["i get that", "not cost effective", "still list", "if i need to sell", "prices they would have given", "mandi and the prices", "list the mandi", "rate batao"]):
+            return {"intent": "MANDI_PRICE", "crop": found_crop}
+
         q_match = re.search(r"(\d+(?:\.\d+)?)\s*(kilo|kg|quintal|ton|bori|katta|क्विंटल|किलो|बोरी)", num_clean)
         if q_match:
             return {"intent": "QUANTITY_INPUT", "crop": found_crop, "quantity_num": float(q_match.group(1)), "quantity_unit": q_match.group(2)}
@@ -311,13 +321,24 @@ class AgriAgentRouter:
                 session.quantity_quintals = round(qty_f, 2)
 
         # -----------------------------------------------------------------
-        # SCENARIO A: MANDI PRICE INQUIRY OR QUANTITY EARNINGS
+        # SCENARIO A: MANDI PRICE INQUIRY, ARBITRAGE & APMC DIRECTORY
         # -----------------------------------------------------------------
-        if intent in ["MANDI_PRICE", "QUANTITY_INPUT"]:
+        is_apmc_dir_intent = intent == "APMC_DIRECTORY" or any(w in raw_text.lower() for w in ["how many apmc", "how many mandi", "nearby apmc", "near my loation", "near my location", "location of apmc", "what about amritsar", "apmc in my state"])
+
+        if intent in ["MANDI_PRICE", "QUANTITY_INPUT", "APMC_DIRECTORY"] or is_apmc_dir_intent:
             target_crop = crop or getattr(session, "commodity", None)
             
-            # If farmer asks about rates generally without mentioning any crop
-            if not target_crop:
+            # Determine location hint from extracted location, user speech, or session memory
+            loc_hint = loc_str or getattr(session, "location_name", None) or getattr(session, "district", None) or getattr(session, "state", "Punjab")
+            lat = getattr(session, "lat", 31.2240) or 31.2240
+            lon = getattr(session, "lon", 75.7708) or 75.7708
+            user_st = getattr(session, "state", "Punjab") or "Punjab"
+
+            # Always fetch verified nearby APMC directory to ground LLM distance reasoning
+            nearby_apmcs = mandi_service.get_nearby_apmc_directory(lat, lon, state=user_st, limit=10)
+
+            # If it's a general APMC directory query and no crop was named, do NOT block with "awaiting commodity"
+            if not target_crop and not is_apmc_dir_intent:
                 spoken = await llm_service.generate_response(
                     user_query=raw_text,
                     farmer_name=f_name,
@@ -325,32 +346,35 @@ class AgriAgentRouter:
                     district=getattr(session, "district", ""),
                     crops=None,
                     history=getattr(session, "chat_history", []),
-                    context_data={"note": "The farmer asked for mandi rates but did not name a crop. Ask them warmly which crop they want the rates for."},
+                    context_data={
+                        "note": "The farmer asked for mandi rates but did not name a crop. Ask them warmly which crop they want the rates for.",
+                        "nearby_apmc_directory": nearby_apmcs
+                    },
                     language=pref_lang
                 )
                 return {
                     "spoken_text": spoken,
                     "step": "AWAITING_COMMODITY",
-                    "data": {"available_crops": ["onion", "tomato", "potato", "wheat", "mustard", "chilli"]}
+                    "data": {"available_crops": ["onion", "tomato", "potato", "wheat", "mustard", "chilli", "paddy"]}
                 }
 
-            # Determine location hint from extracted location, user speech, or session memory
-            loc_hint = loc_str or getattr(session, "location_name", None) or getattr(session, "district", None)
-            if not loc_hint:
-                for kw, st_name in STATE_LOCATION_KEYWORDS.items():
-                    if kw in raw_text.lower():
-                        loc_hint = st_name
-                        break
-
             # Fetch live mandi rates matching location
-            lat = getattr(session, "lat", None)
-            lon = getattr(session, "lon", None)
-            rates = mandi_service.get_rates_for_commodity(
-                target_crop,
-                user_lat=lat,
-                user_lon=lon,
-                location_hint=loc_hint
-            )
+            rates = []
+            if target_crop:
+                rates = mandi_service.get_rates_for_commodity(
+                    target_crop,
+                    user_lat=lat,
+                    user_lon=lon,
+                    location_hint=loc_hint
+                )
+            elif is_apmc_dir_intent and getattr(session, "commodity", None):
+                target_crop = session.commodity
+                rates = mandi_service.get_rates_for_commodity(
+                    target_crop,
+                    user_lat=lat,
+                    user_lon=lon,
+                    location_hint=loc_hint
+                )
 
             # If multiple crops were referenced (e.g. soybean, cotton, groundnut from previous turn)
             multi_crop_rates = {}
@@ -365,27 +389,45 @@ class AgriAgentRouter:
                     if c_rates:
                         multi_crop_rates[c] = c_rates[:3]
 
+            # Check if farmer explicitly acknowledged small-lot cost constraint (Override rule)
+            user_ack_cost = any(phrase in raw_text.lower() for phrase in [
+                "i get that", "not cost effective", "still list", "if i need to sell",
+                "prices they would have given", "mandi and the prices", "list the mandi",
+                "mandi aur price", "bhav batao"
+            ])
+
             # Compute arbitrage math if quantity is known or use standard benchmark
             q_quintals = session.quantity_quintals or 10.0
             has_own = session.has_own_vehicle if session.has_own_vehicle is not None else True
-            evaluated = arbitrage_engine.calculate_arbitrage(rates, q_quintals, has_own_vehicle=has_own)
+            evaluated = arbitrage_engine.calculate_arbitrage(rates, q_quintals, has_own_vehicle=has_own) if rates else []
             session.last_arbitrage_results = evaluated
 
             # Package live data as context for the LLM
             context_data = {
-                "crop": target_crop,
-                "requested_location": loc_hint or "Local Region",
+                "crop": target_crop or "Agricultural Produce",
+                "requested_location": loc_hint or f"{session.location_name}, {session.district}, {session.state}",
+                "user_verified_location": f"{session.location_name}, {session.district}, {session.state}",
                 "quantity_quintals": q_quintals,
                 "has_own_vehicle": has_own,
-                "mandi_rates": rates[:5] if rates else [],
+                "mandi_rates": rates[:8] if rates else [],
+                "nearby_apmc_directory": nearby_apmcs,
                 "arbitrage": evaluated[:3] if evaluated else [],
-                "enam_rules": "Statutory APMC law: Farmer commission is 0%. Buyer pays commission. Electronic weighbridge slip mandatory."
+                "enam_rules": "Statutory APMC law: Farmer commission is 0%. Buyer pays commission. Electronic weighbridge slip mandatory.",
+                "user_acknowledged_cost": user_ack_cost
             }
+            if user_ack_cost:
+                context_data["anti_nagging_directive"] = (
+                    "CRITICAL OVERRIDE: The farmer explicitly acknowledged that selling a small lot is not cost-effective, "
+                    "and specifically insists on receiving the APMC list and modal rates. "
+                    "DO NOT repeat any warnings about transport costs or 10 kg lot size! "
+                    "Directly state the APMC names, their distances, and their modal prices."
+                )
+
             if multi_crop_rates:
                 context_data["multi_crop_rates"] = multi_crop_rates
                 context_data["crops_referred"] = referenced_crops
 
-            llm_crops = referenced_crops if referenced_crops else [target_crop]
+            llm_crops = referenced_crops if referenced_crops else ([target_crop] if target_crop else None)
 
             # The LLM generates the spoken reasoning dynamically
             spoken = await llm_service.generate_response(
@@ -399,16 +441,17 @@ class AgriAgentRouter:
                 language=pref_lang
             )
 
-            # Build digital receipt for WhatsApp
+            # Build digital receipt for WhatsApp if evaluated
             from app.services.dialogue_manager import dialogue_manager
-            slip = dialogue_manager._generate_enhanced_slip(session)
+            slip = dialogue_manager._generate_enhanced_slip(session) if evaluated else {}
             session.mandi_slip = slip
 
             return {
                 "spoken_text": spoken,
-                "step": "ARBITRAGE_DELIVERED",
+                "step": "APMC_DIRECTORY_DELIVERED" if is_apmc_dir_intent else "ARBITRAGE_DELIVERED",
                 "data": {
                     "evaluated_mandis": evaluated,
+                    "nearby_apmcs": nearby_apmcs,
                     "commodity": target_crop,
                     "crops": referenced_crops if referenced_crops else [target_crop],
                     "multi_crop_rates": multi_crop_rates,

@@ -697,6 +697,7 @@ function buildMandiHeroWidget(extra) {
   const top = mandis[0];
   if (!top || !top.mandi_name) return "";
 
+  const isViable = top.is_viable !== false && (top.net_in_hand > 0);
   const commName = extra.commodity ? capitalize(extra.commodity) : "Crop";
   const modalFormatted = Math.round(top.modal_price || 0).toLocaleString('en-IN');
   const netFormatted = Math.round(top.net_rate_per_quintal || top.modal_price || 0).toLocaleString('en-IN');
@@ -704,16 +705,42 @@ function buildMandiHeroWidget(extra) {
   const dist = top.distance_km ? `${top.distance_km} km` : "Local Mandi";
   const locDisplay = `${top.mandi_name}${top.district ? ' (' + top.district + ')' : ''}`;
 
+  const pillHtml = isViable
+    ? `<span class="mandi-top-pill">Best Realization</span>`
+    : `<span class="mandi-top-pill mandi-warning-pill">Unviable for Distant Mandi</span>`;
+
+  const inHandChip = isViable
+    ? `<div class="mandi-stat-chip emerald">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>In-hand: ₹${netFormatted}/qtl</span>
+      </div>`
+    : `<div class="mandi-stat-chip amber">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <span>Logistics Deficit: -₹${Math.round(Math.abs(top.net_in_hand)).toLocaleString('en-IN')}</span>
+      </div>`;
+
+  const totalChip = extra.quantity_quintals
+    ? (isViable
+        ? `<div class="mandi-stat-chip"><span>Est. Total: ₹${netInHandFormatted} (${extra.quantity_quintals} qtl)</span></div>`
+        : `<div class="mandi-stat-chip"><span>Est. Net: Deficit of ₹${Math.round(Math.abs(top.net_in_hand)).toLocaleString('en-IN')} (${extra.quantity_quintals} qtl)</span></div>`)
+    : '';
+
   let secondaryHtml = "";
   if (mandis.length > 1) {
     const others = mandis.slice(1, 3);
-    const rows = others.map(m => `
-      <div class="mandi-compare-row">
-        <span class="mandi-compare-name">${escapeHtml(m.mandi_name || 'APMC')}</span>
-        <span class="mandi-compare-rate">₹${Math.round(m.modal_price).toLocaleString('en-IN')} <span class="sub-rate">(${m.distance_km}km)</span></span>
-        <span class="mandi-compare-net">In-hand: ₹${Math.round(m.net_rate_per_quintal).toLocaleString('en-IN')}</span>
-      </div>
-    `).join("");
+    const rows = others.map(m => {
+      const viable = m.is_viable !== false && (m.net_in_hand > 0);
+      const netText = viable
+        ? `In-hand: ₹${Math.round(m.net_rate_per_quintal).toLocaleString('en-IN')}`
+        : `Deficit: -₹${Math.round(Math.abs(m.net_in_hand)).toLocaleString('en-IN')}`;
+      return `
+        <div class="mandi-compare-row">
+          <span class="mandi-compare-name">${escapeHtml(m.mandi_name || 'APMC')}</span>
+          <span class="mandi-compare-rate">₹${Math.round(m.modal_price).toLocaleString('en-IN')} <span class="sub-rate">(${m.distance_km}km)</span></span>
+          <span class="mandi-compare-net ${viable ? '' : 'deficit-text'}">${netText}</span>
+        </div>
+      `;
+    }).join("");
 
     secondaryHtml = `
       <div class="mandi-compare-grid">
@@ -730,7 +757,7 @@ function buildMandiHeroWidget(extra) {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
           <span>${escapeHtml(locDisplay)}</span>
         </div>
-        <span class="mandi-top-pill">Best Realization</span>
+        ${pillHtml}
       </div>
 
       <div class="mandi-hero-price-row">
@@ -739,18 +766,12 @@ function buildMandiHeroWidget(extra) {
       </div>
 
       <div class="mandi-stats-chips">
-        <div class="mandi-stat-chip emerald">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          <span>In-hand: ₹${netFormatted}/qtl</span>
-        </div>
+        ${inHandChip}
         <div class="mandi-stat-chip">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
           <span>Distance: ${dist}</span>
         </div>
-        ${extra.quantity_quintals ? `
-        <div class="mandi-stat-chip">
-          <span>Est. Total: ₹${netInHandFormatted} (${extra.quantity_quintals} qtl)</span>
-        </div>` : ''}
+        ${totalChip}
       </div>
 
       ${secondaryHtml}

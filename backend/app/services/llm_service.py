@@ -123,6 +123,15 @@ class LLMService:
             ctx_lines = []
             if "mandi_rates" in context_data:
                 ctx_lines.append(f"LIVE MANDI PRICE FEED: {json.dumps(context_data['mandi_rates'], ensure_ascii=False)}")
+            if "nearby_apmc_directory" in context_data:
+                apmcs = context_data["nearby_apmc_directory"]
+                formatted_apmcs = [
+                    f"{a['market']} ({a['district']}): {a['distance_km']} km away"
+                    for a in apmcs
+                ]
+                ctx_lines.append(f"VERIFIED NEARBY APMC DIRECTORY & ROAD DISTANCES: {'; '.join(formatted_apmcs)}")
+            if "anti_nagging_directive" in context_data:
+                ctx_lines.append(f"CRITICAL OVERRIDE DIRECTIVE: {context_data['anti_nagging_directive']}")
             if "multi_crop_rates" in context_data:
                 ctx_lines.append(f"LIVE MULTI-CROP MANDI RATES: {json.dumps(context_data['multi_crop_rates'], ensure_ascii=False)}")
                 ctx_lines.append("CRITICAL INSTRUCTION: The farmer asked about rates for the crops previously discussed (e.g. 'inka daam'). Mention the live modal prices for EACH of these crops clearly from the verified data provided. Do NOT claim you only have data for another crop.")
@@ -166,8 +175,22 @@ class LLMService:
             f"   • Keep the length concise (2 to 4 spoken sentences) because your response is converted directly to voice audio via Gnani Timbre TTS. No markdown formatting, no emojis, no asterisks.\n\n"
             f"4. ABSOLUTE LOCATION FIDELITY (ZERO HALLUCINATIONS):\n"
             f"   • Farmer {f_name}'s verified GPS home location is {loc_str}. All distance and nearest mandi calculations must be measured strictly relative to {loc_str}.\n"
-            f"   • You are strictly FORBIDDEN from inventing or hallucinating fictional place names (such as Mirigubadao or any imaginary place). If stating distance, reference {loc_str} directly.\n"
-            f"   • If the user explicitly asks about another mandi (e.g. 'Azadpur' or 'Lasalgaon'), answer for that specific mandi without changing their home village {loc_str}."
+            f"   • You are strictly FORBIDDEN from inventing or hallucinating fictional place names. If stating distance, reference {loc_str} directly.\n"
+            f"   • If the user explicitly asks about another mandi (e.g. 'Azadpur' or 'Lasalgaon'), answer for that specific mandi without changing their home village {loc_str}.\n\n"
+            f"5. DISTANCE ACCURACY & APMC GEOGRAPHY (ZERO GUESSWORK):\n"
+            f"   • All distances and logistics must be evaluated strictly relative to farmer {f_name}'s verified location: {loc_str}.\n"
+            f"   • NEVER claim that there are no APMC mandis in the vicinity if mandis are listed in the 'VERIFIED NEARBY APMC DIRECTORY & ROAD DISTANCES' context block above.\n"
+            f"   • NEVER guess, invent, or hallucinate road distances. Always quote the exact distances calculated and provided in the verified context data.\n"
+            f"   • ALWAYS prioritize nearby APMCs within the farmer's own state/district before considering distant or out-of-state mandis, unless the farmer specifically asks about another state.\n\n"
+            f"6. ANTI-NAGGING & USER OVERRIDE RULE (STRICT):\n"
+            f"   • DO NOT repeat the same advisory warning across consecutive conversation turns. If you have already cautioned the farmer about small quantities (e.g. 10 kg) or transport cost in an earlier turn, DO NOT preach or repeat that warning again.\n"
+            f"   • If the farmer acknowledges the cost constraint (e.g. 'I know it is not cost-effective, but still list the mandis and prices'), RESPECT THEIR REQUEST COMPLETELY. Immediately and directly list the requested mandis, their true distances, and their modal rates without lecturing.\n"
+            f"   • NEVER claim 'I do not have live mandi price data' when mandi prices or benchmark rates are provided in the verified data block above.\n\n"
+            f"7. RAW PADDY (DHAN) vs MILLED RICE DISTINCTION:\n"
+            f"   • In Indian APMC mandis, raw unhusked crop is traded as Paddy (Dhan / ਧਾਨ). Milled table rice (Chawal) is sold through retail grocery or wholesale millers. When a farmer inquires about selling 'rice' in an APMC, state the APMC Paddy modal rate (MSP ~₹2,320/qtl for common paddy, or ₹3,400-₹3,850/qtl for Basmati).\n\n"
+            f"8. NATURAL STATUTORY eNAM PHRASING:\n"
+            f"   • NEVER say awkward phrases like 'prevailing market rate minus zero percent commission'.\n"
+            f"   • Phrase this naturally and professionally: 'Under statutory eNAM rules, farmers pay 0% commission—the buyer pays all market fees.'"
         )
 
     async def generate_response(
