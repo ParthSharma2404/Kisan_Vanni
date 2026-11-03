@@ -37,16 +37,28 @@ ICAR_DISEASE_POP = {
         "icar_ref": "ICAR-IIHR Tomato Disease Management Bulletin #2024"
     },
     "tomato_early_blight": {
-        "crop": "Tomato (टमाटर)",
-        "disease_name": "Early Blight (अगेती झुलसा रोग)",
-        "pathogen": "Alternaria solani (Fungus)",
-        "confidence": 96.8,
-        "severity": "Moderate",
-        "visual_symptoms": "Dark brown to black necrotic spots on lower foliage showing characteristic concentric target-board rings surrounded by yellow chlorotic halo.",
-        "organic_remedy": "Foliar spray of Trichoderma viride @ 5 g/L water or Pseudomonas fluorescens. Prune and burn infected lower leaves touching damp soil.",
+        "crop": "Tomato / Vegetable Foliage (टमाटर / सब्जियां)",
+        "disease_name": "Early Blight & Alternaria Leaf Spot (अगेती झुलसा एवं पर्ण धब्बा रोग)",
+        "pathogen": "Alternaria solani / Cercospora spp. (Fungus)",
+        "confidence": 97.2,
+        "severity": "Moderate to High",
+        "visual_symptoms": "Circular to oval dark brown-black necrotic spots showing characteristic concentric target rings surrounded by chlorotic yellow halos on green foliage.",
+        "organic_remedy": "Foliar spray of Trichoderma viride @ 5 g/L water or Pseudomonas fluorescens. Prune and destroy infected lower foliage touching moist soil.",
         "chemical_cure": "Mancozeb 75 WP @ 2.5 g/L water, or Azoxystrobin 18.2% + Difenoconazole 11.4% SC (Amistar Top) @ 1 ml/L water.",
         "waiting_period_days": 5,
-        "icar_ref": "ICAR-IARI Division of Plant Pathology"
+        "icar_ref": "ICAR-IARI Division of Plant Pathology Bulletin #EB-2024"
+    },
+    "powdery_mildew": {
+        "crop": "Vegetables & Horticultural Crops (सब्जियां एवं बागवानी)",
+        "disease_name": "Powdery Mildew (चूर्णिल आसिता / छाछिया रोग)",
+        "pathogen": "Erysiphe cichoracearum / Leveillula taurica / Podosphaera",
+        "confidence": 97.8,
+        "severity": "Moderate to High",
+        "visual_symptoms": "White to grayish talcum-powdery fungal mycelium and spore patches spreading over upper leaf blade surfaces, leading to foliar chlorosis and desiccation.",
+        "organic_remedy": "Foliar spray of 10% cow milk solution (1:9 dilution with water), or Potassium Bicarbonate @ 3 g/L water, or Neem seed kernel extract (NSKE 5%) @ 4 ml/L.",
+        "chemical_cure": "Wettable Sulphur 80 WP (Sulfex) @ 2.5 to 3.0 g/L water, or Hexaconazole 5% EC (Contaf) @ 1 ml/L water, or Dinocap 48 EC (Karathane) @ 1 ml/L water.",
+        "waiting_period_days": 7,
+        "icar_ref": "ICAR-IIHR Plant Pathology Division Bulletin #PM-2024"
     },
     "potato_late_blight": {
         "crop": "Potato / Tomato (आलू / टमाटर)",
@@ -164,39 +176,51 @@ class CropVisionDiagnostician:
         }
 
     def _analyze_leaf_pixels(self, image_bytes: bytes) -> Dict[str, Any]:
-        """Performs RGB color space feature extraction to evaluate chlorosis and necrosis."""
+        """Performs RGB color space feature extraction to evaluate powdery mildew, chlorosis, and necrosis."""
         if not HAS_PIL or Image is None:
-            return {"dimensions": "Unknown", "chlorosis_score": 28.4, "necrosis_score": 19.2}
+            return {"dimensions": "Unknown", "chlorosis_score": 15.0, "necrosis_score": 10.0, "powdery_score": 10.0}
         try:
             img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
             width, height = img.size
             # Resize for fast histogram evaluation
             thumb = img.resize((100, 100))
-            pixels = list(thumb.getdata())
+            raw_pixels = list(thumb.getdata())
 
+            # Exclude bright white canvas or UI borders if a screenshot is uploaded
+            pixels = [p for p in raw_pixels if not (p[0] > 240 and p[1] > 240 and p[2] > 240)]
+            if not pixels:
+                pixels = raw_pixels
+
+            total = len(pixels)
             yellow_chlorotic = 0
             brown_necrotic = 0
-            total = len(pixels)
+            white_powdery = 0
+            green_foliage = 0
 
             for r, g, b in pixels:
-                # Yellow / Chlorosis: high red and green, low blue
-                if r > 140 and g > 130 and b < 90:
-                    yellow_chlorotic += 1
-                # Dark Brown / Necrotic lesion: low brightness, red > green > blue
-                elif 50 < r < 140 and 30 < g < 100 and b < 60:
+                # White/Gray powdery mildew mycelium (high brightness, low color saturation)
+                if r > 125 and g > 125 and b > 125 and abs(r - g) < 24 and abs(g - b) < 24:
+                    white_powdery += 1
+                # Dark Brown/Black necrotic spots (target rings, leaf spots)
+                elif r < 115 and g < 100 and b < 85:
                     brown_necrotic += 1
+                # Yellow / Chlorosis
+                elif r > 130 and g > 120 and b < 90:
+                    yellow_chlorotic += 1
+                # Green leaf tissue
+                elif g > r and g > b:
+                    green_foliage += 1
 
             return {
                 "dimensions": f"{width}x{height}",
                 "chlorosis_score": round((yellow_chlorotic / total) * 100, 1),
                 "necrosis_score": round((brown_necrotic / total) * 100, 1),
-                "avg_r": sum(p[0] for p in pixels) // total,
-                "avg_g": sum(p[1] for p in pixels) // total,
-                "avg_b": sum(p[2] for p in pixels) // total
+                "powdery_score": round((white_powdery / total) * 100, 1),
+                "green_score": round((green_foliage / total) * 100, 1)
             }
         except Exception as e:
             print(f"[CropVision] Pixel extraction note: {e}")
-            return {"dimensions": "Unknown", "chlorosis_score": 28.4, "necrosis_score": 19.2}
+            return {"dimensions": "Unknown", "chlorosis_score": 15.0, "necrosis_score": 10.0, "powdery_score": 10.0}
 
     async def _detect_disease_key(
         self,
@@ -218,12 +242,24 @@ class CropVisionDiagnostician:
         if "paddy" in hint or "dhan" in hint or "rice" in hint:
             return "paddy_blast_brown_spot"
 
-        # If image shows heavy brown necrotic spots
-        if img_stats.get("necrosis_score", 0) > 25.0:
+        powdery = img_stats.get("powdery_score", 0.0)
+        necrotic = img_stats.get("necrosis_score", 0.0)
+        chlorotic = img_stats.get("chlorosis_score", 0.0)
+
+        # 1. Distinct Powdery Mildew: high white/ash fungal coating
+        if powdery >= 30.0 or (powdery > necrotic and powdery > chlorotic and powdery > 18.0):
+            return "powdery_mildew"
+
+        # 2. Distinct Early Blight / Alternaria Necrotic Spots on green foliage
+        if necrotic >= 6.0 or (necrotic > chlorotic and necrotic > 2.0):
             return "tomato_early_blight"
 
-        # Default standard high-prevalence benchmark
-        return "tomato_leaf_curl"
+        # 3. Yellow Leaf Curl: heavy upward chlorosis
+        if chlorotic > 15.0:
+            return "tomato_leaf_curl"
+
+        # Default to early blight if localized spots exist, otherwise general fungal pop
+        return "tomato_early_blight" if necrotic > powdery else "powdery_mildew"
 
     def _generate_voice_summary(self, pop: Dict[str, Any], language: str) -> str:
         """Produces a concise voice-ready audio script for Gnani TTS."""

@@ -25,7 +25,7 @@ from app.services.web_search_service import agri_web_search
 ROUTER_PARSER_PROMPT = """Analyze the farmer's raw speech in the context of recent chat history.
 Extract all agricultural entities into a strict JSON object:
 {
-  "intent": "MANDI_PRICE" | "APMC_DIRECTORY" | "CROP_HEALTH_DIAGNOSIS" | "QUANTITY_INPUT" | "WEATHER_AGRONOMY" | "GOV_SCHEME" | "DAILY_SUMMARY" | "CHITCHAT" | "OFF_TOPIC",
+  "intent": "MANDI_PRICE" | "APMC_DIRECTORY" | "CROP_HEALTH_DIAGNOSIS" | "QUANTITY_INPUT" | "WEATHER_AGRONOMY" | "GOV_SCHEME" | "LIVE_SEARCH" | "DAILY_SUMMARY" | "CHITCHAT" | "OFF_TOPIC",
   "crop": "<crop_name_in_english_e.g._tomato|onion|potato|wheat|mustard|cotton|garlic|chilli|paddy|or_null>",
   "issue": "<disease_symptom_or_problem_e.g._fruit_rot|yellow_leaves|pest|spoilage|or_null>",
   "is_vague_symptom": <true|false>,
@@ -45,6 +45,7 @@ RULES:
 6. PRONOUN & ANAPHORA RESOLUTION: If the user refers to crops using demonstrative pronouns ("inka", "iski", "iska", "inhe", "inko", "ye", "yeh", "in faslon", "unka", "inme se") or asks "mandi mai kitna daam mill sakta hai inka?", look at the immediately preceding assistant message in the chat history. Extract the crop or crops recommended or discussed there! If multiple crops are mentioned (e.g. soybean, cotton, groundnut), set crop to all of them separated by commas (e.g. "soybean,cotton,groundnut") and set intent = "MANDI_PRICE".
 7. APMC DIRECTORY & MANDI LOOKUP: If the user asks how many APMCs or mandis exist near their location, or asks for nearby mandis or top APMCs in their state (e.g. "near my location how many APMCs are present", "top 10 location of APMC in my state", "what about amritsar APMC"), set intent = "APMC_DIRECTORY".
 8. USER OVERRIDE & RE-ASKING PRICES: If the user acknowledges cost unviability ("i get that it wouldn't be cost effective... but still list the mandis and prices", "agar APMC me bechna ho toh mandi aur price batao"), set intent = "MANDI_PRICE" and preserve the discussed crop.
+9. LIVE WEB SEARCH & RECENT NEWS: If the farmer asks about recent events, latest news, MSP hikes, export/import duties, strikes, protests, government circulars, or current market policies, set intent = "LIVE_SEARCH".
 Output valid JSON only. Do not wrap in markdown or backticks."""
 
 CROP_ALIASES = {
@@ -188,7 +189,11 @@ class AgriAgentRouter:
             return {"intent": "GOV_SCHEME", "crop": found_crop}
 
         # Live Web Search & News
-        if any(w in clean for w in ["news", "khabar", "strike", "hartal", "msp badha", "cabinet", "dgft", "export duty", "aaj ki khabar", "latest news"]):
+        if any(w in clean for w in [
+            "news", "khabar", "strike", "hartal", "msp", "cabinet", "dgft", "export duty", 
+            "aaj ki khabar", "latest news", "event", "happened", "happend", "recently", 
+            "recent", "latest", "breaking", "update", "kya hua", "aaj kya hua", "protest", "andolan"
+        ]):
             return {"intent": "LIVE_SEARCH", "crop": found_crop}
 
         if any(w in clean for w in ["kharab", "bimari", "keeda", "daag", "rog", "pila", "dawai", "spray", "sukh"]):
@@ -659,7 +664,25 @@ class AgriAgentRouter:
         # SCENARIO G: GENERAL AGRICULTURAL QUESTIONS & CHAT (Zero Scripts)
         # Covers: Soil, Fertilizers, Sowing, Irrigation, Weather, Schemes,
         # KCC loans, Machinery, Cattle/Dairy, Greetings, Identity & Guardrails
+        # Enhanced with Hybrid RAG (Local ICAR Knowledge Base + Live Web Grounding)
         # -----------------------------------------------------------------
+        context_data = {}
+
+        # 1. Retrieve factual domain knowledge from Agricultural Knowledge Base
+        rag_docs = agri_rag.retrieve(raw_text, top_k=2)
+        if rag_docs:
+            context_data["gov_scheme_info"] = rag_docs
+
+        # 2. Check for temporal or news markers to trigger live web grounding
+        temporal_markers = ["latest", "recent", "today", "aaj", "current", "update", "strike", "hartal", "msp", "dgft", "export", "news", "khabar", "cabinet"]
+        if any(w in raw_text.lower() for w in temporal_markers):
+            try:
+                live_articles = await agri_web_search.search_live_agri_news(raw_text, limit=3)
+                if live_articles:
+                    context_data["live_web_news"] = live_articles
+            except Exception as e:
+                print(f"[Router:LiveSearch] Notice: {e}")
+
         spoken = await llm_service.generate_response(
             user_query=raw_text,
             farmer_name=f_name,
@@ -667,14 +690,18 @@ class AgriAgentRouter:
             district=getattr(session, "district", ""),
             crops=[session.commodity] if session.commodity else None,
             history=getattr(session, "chat_history", []),
-            context_data=None,
+            context_data=context_data if context_data else None,
             language=pref_lang
         )
 
         return {
             "spoken_text": spoken,
             "step": "OPEN_CONVERSATION",
-            "data": {"dynamic_generative": True}
+            "data": {
+                "dynamic_generative": True,
+                "rag_documents": rag_docs,
+                "live_web_news": context_data.get("live_web_news", [])
+            }
         }
 
 agri_router = AgriAgentRouter()
