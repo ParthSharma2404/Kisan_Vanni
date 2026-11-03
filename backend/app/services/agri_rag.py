@@ -52,7 +52,8 @@ class AgriRAGService:
             doc_crop = doc.get("crop", "all")
 
             # Crop compatibility filter
-            if detected_crop and doc_crop not in [detected_crop, "all"]:
+            doc_crops = [c.strip() for c in doc_crop.split(",")] if isinstance(doc_crop, str) else [doc_crop]
+            if detected_crop and not any(c in [detected_crop, "all"] for c in doc_crops):
                 continue
 
             # 1. Exact keyword match in keywords list

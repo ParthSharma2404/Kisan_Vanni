@@ -19,6 +19,8 @@ from app.services.agri_rag import agri_rag
 from app.services.mandi_service import mandi_service
 from app.services.arbitrage_engine import arbitrage_engine
 from app.services.enam_rules import enam_advisor
+from app.services.weather_service import agronomy_weather_engine
+from app.services.web_search_service import agri_web_search
 
 ROUTER_PARSER_PROMPT = """Analyze the farmer's raw speech in the context of recent chat history.
 Extract all agricultural entities into a strict JSON object:
@@ -176,6 +178,18 @@ class AgriAgentRouter:
                 crops_found = history_crops
 
         found_crop = crops_found[0] if crops_found else getattr(session, "commodity", None)
+
+        # Weather & Agronomy Intelligence
+        if any(w in clean for w in ["mausam", "weather", "barish", "rain", "temperature", "tapman", "hawa", "wind", "buwai", "sowing", "sinchai", "irrigation", "spray kab kare", "chhidkaw", "drying", "sukhai"]):
+            return {"intent": "WEATHER_AGRONOMY", "crop": found_crop}
+
+        # Government Schemes & Laws
+        if any(w in clean for w in ["kusum", "pm kisan", "pmfby", "fasal bima", "kcc", "credit card", "subsidy", "yojana", "scheme", "soil health"]):
+            return {"intent": "GOV_SCHEME", "crop": found_crop}
+
+        # Live Web Search & News
+        if any(w in clean for w in ["news", "khabar", "strike", "hartal", "msp badha", "cabinet", "dgft", "export duty", "aaj ki khabar", "latest news"]):
+            return {"intent": "LIVE_SEARCH", "crop": found_crop}
 
         if any(w in clean for w in ["kharab", "bimari", "keeda", "daag", "rog", "pila", "dawai", "spray", "sukh"]):
             return {"intent": "CROP_HEALTH_DIAGNOSIS", "crop": found_crop, "is_vague_symptom": "kharab" in clean or "dikkat" in clean}
@@ -568,7 +582,81 @@ class AgriAgentRouter:
             }
 
         # -----------------------------------------------------------------
-        # SCENARIO D: GENERAL AGRICULTURAL QUESTIONS & CHAT (Zero Scripts)
+        # SCENARIO D: HYPERLOCAL WEATHER & AGRONOMY INTELLIGENCE
+        # Covers Sowing, Smart Irrigation, Top-Dressing, Disease, Drying & Spray
+        # -----------------------------------------------------------------
+        if intent == "WEATHER_AGRONOMY":
+            lat = getattr(session, "lat", 31.2240) or 31.2240
+            lon = getattr(session, "lon", 75.7708) or 75.7708
+            loc_label = f"{session.location_name}, {session.district}" if getattr(session, "location_name", None) else "Your Location"
+            
+            weather_data = await agronomy_weather_engine.get_hyperlocal_agronomy(lat, lon, loc_label)
+            
+            spoken = await llm_service.generate_response(
+                user_query=raw_text,
+                farmer_name=f_name,
+                village=getattr(session, "location_name", ""),
+                district=getattr(session, "district", ""),
+                crops=[session.commodity] if session.commodity else None,
+                history=getattr(session, "chat_history", []),
+                context_data={"weather_agronomy": weather_data},
+                language=pref_lang
+            )
+
+            return {
+                "spoken_text": spoken,
+                "step": "WEATHER_AGRONOMY_DELIVERED",
+                "data": weather_data
+            }
+
+        # -----------------------------------------------------------------
+        # SCENARIO E: GOVERNMENT SCHEMES & LEGAL RIGHTS
+        # Covers PM-Kisan, PMFBY, KCC, PM-KUSUM, Soil Health Card, Subsidies
+        # -----------------------------------------------------------------
+        if intent == "GOV_SCHEME":
+            scheme_docs = agri_rag.retrieve(raw_text, top_k=2)
+            spoken = await llm_service.generate_response(
+                user_query=raw_text,
+                farmer_name=f_name,
+                village=getattr(session, "location_name", ""),
+                district=getattr(session, "district", ""),
+                crops=[session.commodity] if session.commodity else None,
+                history=getattr(session, "chat_history", []),
+                context_data={"gov_scheme_info": scheme_docs},
+                language=pref_lang
+            )
+
+            return {
+                "spoken_text": spoken,
+                "step": "SCHEME_ADVISORY",
+                "data": {"scheme_documents": scheme_docs}
+            }
+
+        # -----------------------------------------------------------------
+        # SCENARIO F: LIVE WEB SEARCH & NEWS GROUNDING
+        # Covers breaking MSP hikes, export duties, strikes, cabinet orders
+        # -----------------------------------------------------------------
+        if intent == "LIVE_SEARCH":
+            news_articles = await agri_web_search.search_live_agri_news(raw_text, limit=3)
+            spoken = await llm_service.generate_response(
+                user_query=raw_text,
+                farmer_name=f_name,
+                village=getattr(session, "location_name", ""),
+                district=getattr(session, "district", ""),
+                crops=[session.commodity] if session.commodity else None,
+                history=getattr(session, "chat_history", []),
+                context_data={"live_web_news": news_articles},
+                language=pref_lang
+            )
+
+            return {
+                "spoken_text": spoken,
+                "step": "LIVE_SEARCH_DELIVERED",
+                "data": {"news_articles": news_articles}
+            }
+
+        # -----------------------------------------------------------------
+        # SCENARIO G: GENERAL AGRICULTURAL QUESTIONS & CHAT (Zero Scripts)
         # Covers: Soil, Fertilizers, Sowing, Irrigation, Weather, Schemes,
         # KCC loans, Machinery, Cattle/Dairy, Greetings, Identity & Guardrails
         # -----------------------------------------------------------------

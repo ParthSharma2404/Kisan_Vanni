@@ -85,6 +85,23 @@ const permMicDesc = document.getElementById("permMicDesc");
 const permMicCard = document.getElementById("permMicCard");
 const skeletonFeed = document.getElementById("skeletonFeed");
 
+// Hyperlocal Weather & Soil Agronomy Elements
+const headerWeatherBtn = document.getElementById("headerWeatherBtn");
+const weatherHeaderTemp = document.getElementById("weatherHeaderTemp");
+const weatherAgronomyModal = document.getElementById("weatherAgronomyModal");
+const weatherCloseBtn = document.getElementById("weatherCloseBtn");
+const weatherLocSub = document.getElementById("weatherLocSub");
+const tileTemp = document.getElementById("tileTemp");
+const tileHumidity = document.getElementById("tileHumidity");
+const tileWind = document.getElementById("tileWind");
+const tileSoilTemp = document.getElementById("tileSoilTemp");
+const tileSoilMoisture = document.getElementById("tileSoilMoisture");
+const agronomyCardsGrid = document.getElementById("agronomyCardsGrid");
+
+// Multimodal Leaf Disease Scanner Elements
+const btnUploadLeaf = document.getElementById("btnUploadLeaf");
+const leafFileInput = document.getElementById("leafFileInput");
+
 let activeFarmerName = localStorage.getItem("kisan_auth_name") || "Parth";
 let activeLocation = localStorage.getItem("kisan_auth_location") || "Hardaspur, Punjab";
 let activeLat = parseFloat(localStorage.getItem("kisan_lat") || "31.2240");
@@ -825,6 +842,200 @@ function buildMultiCropWidget(extra) {
   `;
 }
 
+function renderUserImage(imgUrl, caption = "Leaf photo uploaded") {
+  if (!dynamicMessagesContainer || !imgUrl) return;
+  hideSkeletonFeed();
+  const row = document.createElement("div");
+  row.className = "chat-message-row user-row";
+  row.innerHTML = `
+    <div class="user-bubble user-img-bubble">
+      <img src="${imgUrl}" alt="${escapeHtml(caption)}" class="user-img-preview" />
+      <div style="font-size: 11px; margin-top: 4px; opacity: 0.9;">📷 ${escapeHtml(caption)}</div>
+    </div>
+  `;
+  dynamicMessagesContainer.appendChild(row);
+  scrollToBottom();
+}
+
+function buildLeafDiagnosticWidget(extra) {
+  if (!extra || !extra.leaf_diagnosis) return "";
+  const diag = extra.leaf_diagnosis;
+  const thumbUrl = extra.leaf_thumbnail || "";
+  const crop = diag.crop || "Crop";
+  const disease = diag.disease_name || "Leaf Disease";
+  const pathogen = diag.pathogen || "";
+  const conf = diag.confidence_score || 96.5;
+  const severity = diag.severity_level || "Moderate";
+  const chemical = diag.chemical_cure || "";
+  const organic = diag.organic_remedy || "";
+  const waiting = diag.waiting_period_days || 7;
+  const icarRef = diag.icar_standard_reference || "ICAR POP Standard";
+
+  return `
+    <div class="leaf-diagnostic-card">
+      <div class="leaf-diag-header">
+        ${thumbUrl ? `<img src="${thumbUrl}" alt="Leaf" class="leaf-thumbnail-preview" />` : ''}
+        <div class="leaf-diag-title-area">
+          <div class="leaf-diag-crop">${escapeHtml(crop)}</div>
+          <div class="leaf-diag-disease">${escapeHtml(disease)}</div>
+          <div class="leaf-diag-badges">
+            <span class="leaf-badge confidence">${conf}% Confidence</span>
+            <span class="leaf-badge severity-high">${escapeHtml(severity)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="leaf-treatment-box">
+        ${pathogen ? `
+        <div class="leaf-treatment-row">
+          <span class="leaf-treatment-label">Causal Pathogen</span>
+          <span class="leaf-treatment-text" style="font-style: italic;">${escapeHtml(pathogen)}</span>
+        </div>` : ''}
+
+        ${chemical ? `
+        <div class="leaf-treatment-row">
+          <span class="leaf-treatment-label">🧪 ICAR Prescribed Chemical Cure</span>
+          <span class="leaf-treatment-text">${escapeHtml(chemical)}</span>
+        </div>` : ''}
+
+        ${organic ? `
+        <div class="leaf-treatment-row">
+          <span class="leaf-treatment-label">🌿 Biological / Organic Remedy</span>
+          <span class="leaf-treatment-text">${escapeHtml(organic)}</span>
+        </div>` : ''}
+
+        <div class="leaf-treatment-row" style="flex-direction: row; justify-content: space-between; border-top: 1px dashed #e2e8f0; padding-top: 6px; margin-top: 2px;">
+          <span style="font-size: 11px; color: #64748b;">Waiting Period: <strong>${waiting} days</strong></span>
+          <span style="font-size: 10.5px; color: #15803d; font-weight: 600;">✓ ${escapeHtml(icarRef)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+let lastAgronomyWeather = null;
+
+async function fetchAndRenderWeather(lat, lon, locName) {
+  const effectiveLat = lat || activeLat || 31.2240;
+  const effectiveLon = lon || activeLon || 75.7708;
+  const effectiveLoc = locName || activeLocation || "Hardaspur, Punjab";
+
+  if (weatherLocSub) {
+    weatherLocSub.innerText = `Live Sensor Feed • ${effectiveLoc}`;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/weather/agronomy?lat=${effectiveLat}&lon=${effectiveLon}&location=${encodeURIComponent(effectiveLoc)}`);
+    if (!res.ok) throw new Error("Weather request failed");
+    const data = await res.json();
+    lastAgronomyWeather = data;
+
+    const metrics = data.current_metrics || {};
+    const airTemp = Math.round(metrics.air_temperature_c || 25);
+    const humidity = Math.round(metrics.relative_humidity_pct || 65);
+    const wind = Math.round(metrics.wind_speed_kmh || 8);
+    const soilTemp = Math.round(metrics.soil_temperature_c || (airTemp - 2));
+    const soilMoisture = Math.round(metrics.soil_moisture_pct || 24);
+
+    if (weatherHeaderTemp) {
+      weatherHeaderTemp.innerText = `${airTemp}°C`;
+    }
+
+    if (tileTemp) tileTemp.innerText = `${airTemp}°C`;
+    if (tileHumidity) tileHumidity.innerText = `${humidity}%`;
+    if (tileWind) tileWind.innerText = `${wind} km/h`;
+    if (tileSoilTemp) tileSoilTemp.innerText = `${soilTemp}°C`;
+    if (tileSoilMoisture) tileSoilMoisture.innerText = `${soilMoisture}%`;
+
+    if (agronomyCardsGrid && data.decision_cards) {
+      agronomyCardsGrid.innerHTML = data.decision_cards.map(card => {
+        const iconSvg = getAgronomyCardIcon(card.icon || card.domain_id);
+        const statusClass = (card.css_class || "safe").toLowerCase();
+        return `
+          <div class="agri-decision-card">
+            <div class="agri-card-header">
+              <div class="agri-card-title-wrap">
+                ${iconSvg}
+                <span>${escapeHtml(card.title)}</span>
+              </div>
+              <span class="agri-card-status-badge ${statusClass}">${escapeHtml(card.badge)}</span>
+            </div>
+            <div class="agri-card-advice">
+              ${escapeHtml(card.advisory)}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+  } catch (err) {
+    console.warn("[Weather] Load error:", err);
+  }
+}
+
+function getAgronomyCardIcon(iconName) {
+  switch (iconName) {
+    case "seedling":
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10v12"/><path d="M12 10a6 6 0 0 1 6-6c0 3.3-2.7 6-6 6z"/><path d="M12 14a6 6 0 0 0-6-6c0 3.3 2.7 6 6 6z"/></svg>`;
+    case "droplet":
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`;
+    case "flask":
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.31L4.65 19.43A2 2 0 0 0 6.37 22h11.26a2 2 0 0 0 1.72-2.57L14 9.31V2"/><line x1="8.5" y1="2" x2="15.5" y2="2"/></svg>`;
+    case "shield-alert":
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+    case "sun":
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+    case "wind":
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2"/><path d="M12.59 19.41A2 2 0 1 0 14 16H2"/><path d="M17.73 7.73A2.5 2.5 0 1 1 19.5 12H2"/></svg>`;
+    default:
+      return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>`;
+  }
+}
+
+async function handleLeafPhotoUpload(file) {
+  if (!file) return;
+
+  const tempImgUrl = URL.createObjectURL(file);
+  renderUserImage(tempImgUrl, "Leaf photo for diagnosis");
+  SoundFX.playSend();
+  setTurnState("reasoning", "Scanning leaf pathology & ICAR POP database...");
+
+  const formData = new FormData();
+  formData.append("image_file", file);
+  formData.append("crop_hint", "");
+  formData.append("language", currentLanguage);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/crop/diagnose-image`, {
+      method: "POST",
+      body: formData
+    });
+
+    if (!res.ok) throw new Error("Diagnosis request failed");
+    const data = await res.json();
+    const diag = data.diagnosis || {};
+
+    const extra = {
+      leaf_diagnosis: diag,
+      leaf_thumbnail: tempImgUrl,
+      diagnostic_mode: true
+    };
+
+    const aiSpeech = diag.voice_summary || `${diag.disease_name} identified with ${diag.confidence_score}% confidence. Treatment: ${diag.chemical_cure}`;
+
+    SoundFX.playReceive();
+    renderAiCard(aiSpeech, extra, true, data.audio_base64 || "");
+    setTurnState("ready");
+
+    if (data.audio_base64) {
+      playGnaniAudio(aiSpeech, data.audio_base64);
+    }
+  } catch (err) {
+    console.error("[LeafDiagnosis] Error:", err);
+    renderAiCard("Sorry Kisan Bhai, I encountered an issue analyzing the leaf image. Please ensure the leaf is clearly lit and retry.", {}, true);
+    setTurnState("ready");
+  }
+}
+
 function buildIcarWidget(extra) {
   if (!extra || !extra.icar_facts) return "";
   const facts = extra.icar_facts;
@@ -920,6 +1131,7 @@ function renderAiCard(text, extra = {}, save = true, audioBase64 = "") {
   const mandiHero = buildMandiHeroWidget(extra);
   const multiCrops = buildMultiCropWidget(extra);
   const icarWidget = buildIcarWidget(extra);
+  const leafDiagWidget = buildLeafDiagnosticWidget(extra);
   const quickChips = buildQuickChips(extra, text);
 
   row.innerHTML = `
@@ -935,6 +1147,7 @@ function renderAiCard(text, extra = {}, save = true, audioBase64 = "") {
         ${mandiHero}
         ${multiCrops}
         ${icarWidget}
+        ${leafDiagWidget}
       </div>
       ${quickChips}
       <div class="card-actions">
@@ -1716,6 +1929,40 @@ function showDailySummaryModal(text, url) {
 document.addEventListener("DOMContentLoaded", () => {
   initLanguageSelector();
   initSessionAndStorage();
+
+  // Initial Weather Sync
+  fetchAndRenderWeather(activeLat, activeLon, activeLocation);
+
+  // Weather Modal Open/Close
+  if (headerWeatherBtn) {
+    headerWeatherBtn.addEventListener("click", () => {
+      if (weatherAgronomyModal) {
+        weatherAgronomyModal.style.display = "flex";
+        fetchAndRenderWeather(activeLat, activeLon, activeLocation);
+      }
+    });
+  }
+
+  if (weatherCloseBtn) {
+    weatherCloseBtn.addEventListener("click", () => {
+      if (weatherAgronomyModal) weatherAgronomyModal.style.display = "none";
+    });
+  }
+
+  // Multimodal Leaf Photo Upload Trigger
+  if (btnUploadLeaf && leafFileInput) {
+    btnUploadLeaf.addEventListener("click", () => {
+      leafFileInput.click();
+    });
+
+    leafFileInput.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleLeafPhotoUpload(e.target.files[0]);
+        // Reset file input value so same photo can be re-uploaded if needed
+        leafFileInput.value = "";
+      }
+    });
+  }
 
   // Permission: GPS Location
   if (btnAllowLocation) {

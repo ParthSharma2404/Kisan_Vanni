@@ -68,6 +68,22 @@
           <span class="wa-btn-label">Summary</span>
         </button>
 
+        <!-- Live Hyperlocal Weather & Agronomy Pill -->
+        <button id="headerWeatherBtn" class="btn-weather-header" title="Live Weather & Regional Agronomy Advisory">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <span id="weatherHeaderTemp" class="weather-temp-label">--°C</span>
+        </button>
+
         <!-- Persistent Farmer Account Badge (Circular Profile Icon) -->
         <div class="user-chip" id="topUserBadge" title="Farmer Account">
           <span class="user-icon">
@@ -141,6 +157,15 @@
       </div>
 
       <div class="input-dock-row">
+        <!-- Leaf Disease Photo Scanner Trigger Button -->
+        <button type="button" id="btnUploadLeaf" class="btn-leaf-camera" title="Scan diseased leaf / crop photo" aria-label="Upload crop image">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+        </button>
+        <input type="file" id="leafFileInput" accept="image/*" capture="environment" style="display: none;">
+
         <!-- Text Input Form -->
         <form id="chatTextForm" class="chat-input-box">
           <input 
@@ -212,7 +237,12 @@
         <!-- Permissions Gate Cards -->
         <div class="permissions-gate-container">
           <div class="perm-card" id="permLocationCard">
-            <div class="perm-icon">📍</div>
+            <div class="perm-icon-badge location-badge">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+            </div>
             <div class="perm-info">
               <div class="perm-title">GPS Location Access</div>
               <div class="perm-desc" id="permLocationDesc">Needed to calculate nearest APMC mandis & live freight.</div>
@@ -223,7 +253,14 @@
           </div>
 
           <div class="perm-card" id="permMicCard">
-            <div class="perm-icon">🎙️</div>
+            <div class="perm-icon-badge mic-badge">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+            </div>
             <div class="perm-info">
               <div class="perm-title">Microphone Access</div>
               <div class="perm-desc" id="permMicDesc">Needed for hands-free voice Krishi advisory.</div>
@@ -265,6 +302,60 @@
     </div>
   </div>
 
-  <script src="app.js?v=27"></script>
+  <!-- Hyperlocal Weather & Comprehensive Agronomy Intelligence Drawer -->
+  <div class="weather-modal-overlay" id="weatherAgronomyModal" style="display: none;">
+    <div class="weather-modal-card">
+      <div class="weather-modal-header">
+        <div class="weather-header-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <div>
+            <h3>Hyperlocal Weather & Agronomy Intelligence</h3>
+            <span class="weather-loc-sub" id="weatherLocSub">Live Open-Meteo GPS Sensor Feed</span>
+          </div>
+        </div>
+        <button class="weather-close-btn" id="weatherCloseBtn">&times;</button>
+      </div>
+
+      <div class="weather-hero-row" id="weatherHeroMetrics">
+        <div class="weather-metric-tile">
+          <span class="metric-val" id="tileTemp">--°C</span>
+          <span class="metric-lbl">Air Temp</span>
+        </div>
+        <div class="weather-metric-tile">
+          <span class="metric-val" id="tileHumidity">--%</span>
+          <span class="metric-lbl">Humidity</span>
+        </div>
+        <div class="weather-metric-tile">
+          <span class="metric-val" id="tileWind">-- km/h</span>
+          <span class="metric-lbl">Wind Speed</span>
+        </div>
+        <div class="weather-metric-tile">
+          <span class="metric-val" id="tileSoilTemp">--°C</span>
+          <span class="metric-lbl">Soil Temp (0-6cm)</span>
+        </div>
+        <div class="weather-metric-tile">
+          <span class="metric-val" id="tileSoilMoisture">--%</span>
+          <span class="metric-lbl">Soil Moisture</span>
+        </div>
+      </div>
+
+      <!-- 6 Full-Spectrum Agronomy Decision Intelligence Cards -->
+      <div class="agronomy-cards-grid" id="agronomyCardsGrid">
+        <div class="agri-card-skeleton">Connecting to live meteorological & soil sensor grid...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=30"></script>
 </body>
 </html>

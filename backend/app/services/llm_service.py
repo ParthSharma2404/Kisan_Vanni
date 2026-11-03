@@ -157,6 +157,26 @@ class LLMService:
                 ctx_lines.append(f"eNAM STATUTORY LEGAL PROTECTIONS: {json.dumps(context_data['enam_rules'], ensure_ascii=False)}")
             if "weather" in context_data:
                 ctx_lines.append(f"LOCAL WEATHER CONTEXT: {json.dumps(context_data['weather'], ensure_ascii=False)}")
+            if "weather_agronomy" in context_data:
+                wa = context_data["weather_agronomy"]
+                metrics = wa.get("current_metrics", {})
+                cards = wa.get("decision_cards", [])
+                ctx_lines.append(
+                    f"HYPERLOCAL WEATHER & SOIL TELEMETRY: Temp: {metrics.get('air_temperature_c')}C, "
+                    f"Humidity: {metrics.get('relative_humidity_pct')}%, Wind: {metrics.get('wind_speed_kmh')} km/h, "
+                    f"Soil Temp: {metrics.get('soil_temperature_c')}C, Soil Moisture: {metrics.get('soil_moisture_pct')}%, "
+                    f"48h Rain Chance: {metrics.get('rain_prob_48h_pct')}%."
+                )
+                for c in cards:
+                    ctx_lines.append(f"AGRONOMY DECISION [{c['title']}]: {c['badge']} - {c['advisory']}")
+            if "live_web_news" in context_data:
+                news_items = context_data["live_web_news"]
+                news_strs = [f"- {n['title']} ({n['source']}): {n['snippet']}" for n in news_items]
+                ctx_lines.append("REAL-TIME WEB SEARCH & BREAKING AGRICULTURAL NEWS:\n" + "\n".join(news_strs))
+            if "gov_scheme_info" in context_data:
+                s_docs = context_data["gov_scheme_info"]
+                s_strs = [f"- {d.get('topic')}: {d.get('content')}" for d in s_docs]
+                ctx_lines.append("VERIFIED GOVERNMENT SCHEMES & ENTITLEMENTS:\n" + "\n".join(s_strs))
             if ctx_lines:
                 ctx_block = "\n\n[VERIFIED REAL-TIME DATA & SCIENTIFIC FACTS TO USE IN YOUR ANSWER]:\n" + "\n".join(ctx_lines)
 
