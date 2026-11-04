@@ -1214,9 +1214,9 @@ html, body {
   width: 2.5px;
   height: 12px;
   background-color: var(--carbon-black);
-  border-radius: 2px;
+  border-radius: 999px;
   animation: wave-bar-pulse 0.9s infinite ease-in-out;
-  transform-origin: bottom;
+  transform-origin: center;
   transition: transform 0.08s ease;
 }
 
@@ -1230,29 +1230,25 @@ html, body {
   50% { transform: scaleY(1.15); opacity: 1; }
 }
 
-/* Status States */
+/* Status States - Clean Carbon Scandinavian Tone */
 .turn-status-bar.speaking {
-  color: #0284c7;
+  color: var(--carbon-black);
 }
 .turn-status-bar.speaking .status-indicator-dot {
-  background-color: #0284c7;
-  border-color: #0284c7;
-  box-shadow: 0 0 6px rgba(2, 132, 199, 0.4);
+  display: none;
 }
 .turn-status-bar.speaking .wave-bar {
-  background-color: #0284c7;
+  background-color: var(--carbon-black);
 }
 
 .turn-status-bar.recording {
-  color: #ef4444;
+  color: var(--carbon-black);
 }
 .turn-status-bar.recording .status-indicator-dot {
-  background-color: #ef4444;
-  border-color: #ef4444;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  display: none;
 }
 .turn-status-bar.recording .wave-bar {
-  background-color: #ef4444;
+  background-color: var(--carbon-black);
 }
 
 .input-dock-row {
@@ -1386,23 +1382,23 @@ html, body {
   box-shadow: 0 0 0 6px rgba(200, 255, 47, 0.5), 0 4px 18px rgba(200, 255, 47, 0.7);
 }
 
-/* Mic State 2: Active Recording / Listening (Obsidian Core with Crimson Acoustic Pulse) */
+/* Mic State 2: Active Recording / Listening (Pure Volt-Lime Signature Listening Aura - Zero Red) */
 .dock-mic-btn.recording {
-  background: #111111;
-  color: var(--volt-lime);
-  border: 2px solid #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3), 0 0 16px rgba(239, 68, 68, 0.5);
-  animation: mic-recording-pulse 1.3s infinite ease-in-out;
+  background: var(--volt-lime);
+  color: var(--carbon-black);
+  border: none;
+  box-shadow: 0 0 0 3px rgba(200, 255, 47, 0.45), 0 4px 18px rgba(200, 255, 47, 0.55);
+  animation: mic-listening-pulse 1.8s infinite ease-in-out;
 }
 
-@keyframes mic-recording-pulse {
+@keyframes mic-listening-pulse {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3), 0 0 12px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 0 2px rgba(200, 255, 47, 0.35), 0 2px 10px rgba(200, 255, 47, 0.4);
   }
   50% {
-    transform: scale(1.06);
-    box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.5), 0 0 20px rgba(239, 68, 68, 0.7);
+    transform: scale(1.05);
+    box-shadow: 0 0 0 6px rgba(200, 255, 47, 0.5), 0 4px 22px rgba(200, 255, 47, 0.7);
   }
 }
 

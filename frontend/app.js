@@ -731,7 +731,7 @@ function setTurnState(state, message = "") {
     // Farmer is actively speaking
     isAiSpeaking = false;
     if (reasoningIndicator) reasoningIndicator.style.display = "none";
-    if (turnStatusText) turnStatusText.innerText = message || "Listening... Speak in any language";
+    if (turnStatusText) turnStatusText.innerText = message || "Listening...";
     if (mainMicBtn) {
       mainMicBtn.className = "dock-mic-btn recording";
       mainMicBtn.setAttribute("title", "Tap when finished speaking");
@@ -1675,7 +1675,7 @@ function startBrowserSpeechRecognition() {
       }
       liveTranscribedText = sanitizeAntiUrdu((final + interim).trim());
       if (liveTranscribedText && turnStatusText && isRecording) {
-        turnStatusText.innerText = `"${liveTranscribedText}"`;
+        turnStatusText.innerText = liveTranscribedText;
       }
     };
 
@@ -1747,7 +1747,7 @@ async function startMicrophoneRecording() {
     speechStartTime = 0;
     isRecording = true;
 
-    setTurnState("recording", "Listening... Speak in any language");
+    setTurnState("recording", "Listening...");
 
     audioProcessor.onaudioprocess = (e) => {
       if (!isRecording) return;
@@ -1779,7 +1779,7 @@ async function startMicrophoneRecording() {
         isSpeaking = true;
         silenceStartTime = 0;
         if (!liveTranscribedText && turnStatusText) {
-          turnStatusText.innerText = "Listening... Speak clearly";
+          turnStatusText.innerText = "Listening...";
         }
       } else {
         if (isSpeaking) {
