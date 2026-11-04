@@ -123,6 +123,53 @@ function hideSkeletonFeed() {
   if (skeletonFeed) skeletonFeed.style.display = "none";
 }
 
+// High-Precision Architectural SVG Icons (Replacing raw emojis across entire app)
+const SVG_ICONS = {
+  grain: `<svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 10-10"/><path d="m9 15 3-3 3 3"/><path d="m12 12 3-3 3 3"/><path d="m15 9 3-3 3 3"/><path d="M17 5a2 2 0 0 1 2-2c0 2-1 3-2 3Z"/></svg>`,
+  cotton: `<svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.5"/><path d="M8 12a3.5 3.5 0 1 1 3.5-3.5"/><path d="M16 12a3.5 3.5 0 1 0-3.5-3.5"/><path d="M12 15.5a3.5 3.5 0 1 0 3.5-3.5"/><path d="M12 15.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M12 16v5"/></svg>`,
+  tomato: `<svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="7.5"/><path d="M12 6.5V2.5"/><path d="M10 5c1 1 2 1 2 1s1 0 2-1"/></svg>`,
+  bulb: `<svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v3"/><path d="M12 5c-4 0-7 3.5-7 7.5 0 3.5 3.1 6.5 7 6.5s7-3 7-6.5C19 8.5 16 5 12 5Z"/><path d="M12 5c-1.8 2-2.5 4.5-2.5 7.5"/></svg>`,
+  potato: `<svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-4.5 0-8 3-8 7.5 0 3.8 2.8 7.5 6.5 8.5 4.5 1.2 8.5-.8 9.5-4.5 1-3.5-.5-7-3-9.5-1.5-1.5-3-2-5-2Z"/><circle cx="9" cy="9" r="1"/><circle cx="14" cy="13" r="1"/></svg>`,
+  chilli: `<svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3c1 2 1 3.5-1 5-4 3-6 7-4 11 2 4 8 2 9-2 1-4-1-7-4-14Z"/><path d="M14 3c0-1.5 1-2 2-2"/></svg>`,
+  flower: `<svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 16.5A4.5 4.5 0 1 1 7.5 12"/><path d="M12 7.5A4.5 4.5 0 1 1 16.5 12"/><path d="M7.5 12A4.5 4.5 0 1 1 12 7.5"/><path d="M16.5 12A4.5 4.5 0 1 1 12 16.5"/><path d="M12 19v3"/></svg>`,
+  sprout: `<svg class="ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c0-4 2-7 5-8"/><path d="M12 14c-3-1-5-4-5-8 4 0 7 2 8 5"/><path d="M15 12c2.5-1 4-3 4-6-3 0-5.5 1.5-6.5 4"/></svg>`,
+  chemical: `<svg class="inline-svg-icon chemical" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><line x1="8.5" y1="2" x2="15.5" y2="2"/><line x1="7" y1="16" x2="17" y2="16"/></svg>`,
+  organic: `<svg class="inline-svg-icon organic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`,
+  check: `<svg class="inline-svg-icon check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  camera: `<svg class="inline-svg-icon camera" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
+  document: `<svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+  scale: `<svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>`,
+  clock: `<svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  search: `<svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`
+};
+
+function getCropSvg(cropName) {
+  if (!cropName) return SVG_ICONS.sprout;
+  const name = cropName.toLowerCase().trim();
+  if (name.includes("wheat") || name.includes("gehun") || name.includes("paddy") || name.includes("dhan") || name.includes("rice")) {
+    return SVG_ICONS.grain;
+  }
+  if (name.includes("cotton") || name.includes("kapas")) {
+    return SVG_ICONS.cotton;
+  }
+  if (name.includes("tomato") || name.includes("tamatar")) {
+    return SVG_ICONS.tomato;
+  }
+  if (name.includes("onion") || name.includes("pyaaz") || name.includes("garlic") || name.includes("lahsun")) {
+    return SVG_ICONS.bulb;
+  }
+  if (name.includes("potato") || name.includes("aloo")) {
+    return SVG_ICONS.potato;
+  }
+  if (name.includes("chilli") || name.includes("mirch") || name.includes("pepper")) {
+    return SVG_ICONS.chilli;
+  }
+  if (name.includes("mustard") || name.includes("sarson")) {
+    return SVG_ICONS.flower;
+  }
+  return SVG_ICONS.sprout;
+}
+
 // SVG Icons
 const MIC_IDLE_SVG = `
   <svg class="mic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
@@ -155,6 +202,31 @@ const SoundFX = {
       if (this.ctx && this.ctx.state === "suspended") {
         this.ctx.resume().catch(() => {});
       }
+    } catch (e) {}
+  },
+
+  // Crisp acoustic feedback when mic is tapped
+  playMicClick() {
+    try {
+      this.init();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(780, now + 0.05);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.14, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.08);
     } catch (e) {}
   },
 
@@ -440,18 +512,54 @@ function getTodayDateKey() {
   }
 }
 
+function checkDayRollover() {
+  const currentToday = getTodayDateKey();
+  const lastDate = localStorage.getItem("kisan_last_session_date");
+  if (lastDate && lastDate !== currentToday) {
+    console.log(`[DayRollover] Day transition detected (${lastDate} -> ${currentToday}). Purging yesterday chats for fresh morning start.`);
+    localStorage.setItem("kisan_last_session_date", currentToday);
+
+    // Purge any stored chat histories from previous days
+    const allKeys = Object.keys(localStorage);
+    for (const key of allKeys) {
+      if (key.startsWith("kisan_chat_") && !key.endsWith(currentToday)) {
+        localStorage.removeItem(key);
+      }
+    }
+
+    // Reset visible chat container for a clean fresh start
+    if (dynamicMessagesContainer) dynamicMessagesContainer.innerHTML = "";
+
+    // Refresh session identifier to today's date
+    if (activePhone) {
+      sessionId = `call_${activePhone}_${currentToday.replace(/-/g, '')}`;
+    }
+
+    // Load pristine morning welcome greeting
+    loadTodayChatHistory();
+  }
+}
+
+// Watchdogs for fresh-day rollover across midnight
+setInterval(checkDayRollover, 30000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") checkDayRollover();
+});
+window.addEventListener("focus", checkDayRollover);
+
 function initSessionAndStorage() {
   const savedPhone = localStorage.getItem("kisan_auth_phone");
   const savedLoc = localStorage.getItem("kisan_auth_location");
   const todayKey = getTodayDateKey();
 
-  // Purge any stored chat histories from previous days (24h retention)
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith("kisan_chat_") && !key.endsWith(todayKey)) {
+  // Purge any stored chat histories from previous days (guarantees fresh start each day)
+  const allKeys = Object.keys(localStorage);
+  for (const key of allKeys) {
+    if (key.startsWith("kisan_chat_") && !key.endsWith(todayKey)) {
       localStorage.removeItem(key);
     }
   }
+  localStorage.setItem("kisan_last_session_date", todayKey);
 
   // Strict Onboarding Gate: If new user or missing phone, FREEZE EVERYTHING in background!
   if (!savedPhone || savedPhone.length !== 10) {
@@ -583,13 +691,24 @@ function setTurnState(state, message = "") {
     turnStatusBar.className = `turn-status-bar ${state}`;
   }
 
+  const audioWaveBars = document.getElementById("audioWaveBars");
+  if (state === "recording") {
+    if (audioWaveBars) audioWaveBars.style.display = "inline-flex";
+  } else {
+    if (audioWaveBars) {
+      audioWaveBars.style.display = "none";
+      const bars = audioWaveBars.querySelectorAll(".wave-bar");
+      bars.forEach(b => { b.style.transform = ""; });
+    }
+  }
+
   if (state === "speaking") {
-    // AI is speaking -> Mic MUST be safely locked to avoid echo & noise
+    // AI is speaking -> Mic locked
     isAiSpeaking = true;
-    if (turnStatusText) turnStatusText.innerText = message || "AI Buddy speaking... (Mic muted)";
+    if (turnStatusText) turnStatusText.innerText = message || "Kisan Vaani speaking... (tap mic to interrupt)";
     if (mainMicBtn) {
       mainMicBtn.className = "dock-mic-btn locked";
-      mainMicBtn.setAttribute("title", "AI is speaking...");
+      mainMicBtn.setAttribute("title", "AI is speaking (tap to interrupt)");
     }
     if (micIconHolder) micIconHolder.innerHTML = MIC_LOCKED_SVG;
     if (activeStatusText) activeStatusText.innerText = "Speaking...";
@@ -597,22 +716,22 @@ function setTurnState(state, message = "") {
   else if (state === "reasoning") {
     // AI is computing/reasoning -> Mic locked
     isAiSpeaking = true;
-    if (turnStatusText) turnStatusText.innerText = message || "AI reasoning...";
+    if (turnStatusText) turnStatusText.innerText = message || "Analyzing agricultural query...";
     if (mainMicBtn) {
       mainMicBtn.className = "dock-mic-btn locked";
-      mainMicBtn.setAttribute("title", "AI reasoning...");
+      mainMicBtn.setAttribute("title", "Analyzing agricultural query...");
     }
     if (micIconHolder) micIconHolder.innerHTML = MIC_LOCKED_SVG;
-    if (activeStatusText) activeStatusText.innerText = "Reasoning...";
+    if (activeStatusText) activeStatusText.innerText = "Analyzing...";
     if (reasoningIndicator) reasoningIndicator.style.display = "flex";
-    if (reasoningBadgeText) reasoningBadgeText.innerText = message || "AI reasoning...";
+    if (reasoningBadgeText) reasoningBadgeText.innerText = message || "Synthesizing ICAR knowledge...";
     scrollToBottom();
   } 
   else if (state === "recording") {
     // Farmer is actively speaking
     isAiSpeaking = false;
     if (reasoningIndicator) reasoningIndicator.style.display = "none";
-    if (turnStatusText) turnStatusText.innerText = message || "🎙️ Listening... speak now (tap to stop or pause for 2s)";
+    if (turnStatusText) turnStatusText.innerText = message || "Listening... Speak in any language";
     if (mainMicBtn) {
       mainMicBtn.className = "dock-mic-btn recording";
       mainMicBtn.setAttribute("title", "Tap when finished speaking");
@@ -675,21 +794,9 @@ function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-const CROP_ICONS = {
-  soyabean: "🌱", soybean: "🌱",
-  cotton: "🌾", kapas: "🌾",
-  groundnut: "🥜", mungfali: "🥜",
-  tomato: "🍅", tamatar: "🍅",
-  onion: "🧅", pyaaz: "🧅",
-  potato: "🥔", aloo: "🥔",
-  wheat: "🌾", gehun: "🌾",
-  mustard: "🌼", sarson: "🌼",
-  chana: "🧆", gram: "🧆",
-  chilli: "🌶️", mirch: "🌶️",
-  garlic: "🧄", lahsun: "🧄",
-  maize: "🌽", makka: "🌽",
-  paddy: "🌾", dhan: "🌾"
-};
+const CROP_ICONS = new Proxy({}, {
+  get: (target, name) => getCropSvg(name)
+});
 
 const CROP_DISPLAY_NAMES = {
   soyabean: "सोयाबीन (Soybean)",
@@ -807,7 +914,7 @@ function buildMultiCropWidget(extra) {
   if (cropKeys.length <= 1) return "";
 
   const cardsHtml = cropKeys.map(crop => {
-    const icon = CROP_ICONS[crop.toLowerCase()] || "🌱";
+    const icon = getCropSvg(crop);
     const displayName = capitalize(crop);
     const rates = multiRates[crop];
     let priceText = "Check Rate";
@@ -850,7 +957,10 @@ function renderUserImage(imgUrl, caption = "Leaf photo uploaded") {
   row.innerHTML = `
     <div class="user-bubble user-img-bubble">
       <img src="${imgUrl}" alt="${escapeHtml(caption)}" class="user-img-preview" />
-      <div style="font-size: 11px; margin-top: 4px; opacity: 0.9;">📷 ${escapeHtml(caption)}</div>
+      <div style="font-size: 11px; margin-top: 4px; opacity: 0.9; display: flex; align-items: center; gap: 4px;">
+        <span class="inline-svg-icon camera">${SVG_ICONS.camera}</span>
+        <span>${escapeHtml(caption)}</span>
+      </div>
     </div>
   `;
   dynamicMessagesContainer.appendChild(row);
@@ -894,19 +1004,19 @@ function buildLeafDiagnosticWidget(extra) {
 
         ${chemical ? `
         <div class="leaf-treatment-row">
-          <span class="leaf-treatment-label">🧪 ICAR Prescribed Chemical Cure</span>
+          <span class="leaf-treatment-label">${SVG_ICONS.chemical} ICAR Prescribed Chemical Cure</span>
           <span class="leaf-treatment-text">${escapeHtml(chemical)}</span>
         </div>` : ''}
 
         ${organic ? `
         <div class="leaf-treatment-row">
-          <span class="leaf-treatment-label">🌿 Biological / Organic Remedy</span>
+          <span class="leaf-treatment-label">${SVG_ICONS.organic} Biological / Organic Remedy</span>
           <span class="leaf-treatment-text">${escapeHtml(organic)}</span>
         </div>` : ''}
 
         <div class="leaf-treatment-row" style="flex-direction: row; justify-content: space-between; border-top: 1px dashed #e2e8f0; padding-top: 6px; margin-top: 2px;">
           <span style="font-size: 11px; color: #64748b;">Waiting Period: <strong>${waiting} days</strong></span>
-          <span style="font-size: 10.5px; color: #15803d; font-weight: 600;">✓ ${escapeHtml(icarRef)}</span>
+          <span style="font-size: 10.5px; color: #15803d; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;">${SVG_ICONS.check} ${escapeHtml(icarRef)}</span>
         </div>
       </div>
     </div>
@@ -1057,11 +1167,13 @@ function buildIcarWidget(extra) {
       <div class="icar-rx-boxes">
         ${organic ? `
         <div class="icar-rx-box">
-          <strong>🌿 Organic Treatment:</strong> ${escapeHtml(organic)}
+          <strong style="display: flex; align-items: center; gap: 4px;">${SVG_ICONS.organic} Organic Treatment:</strong>
+          <span>${escapeHtml(organic)}</span>
         </div>` : ''}
         ${chemical ? `
         <div class="icar-rx-box chemical">
-          <strong>🧪 Chemical Remedy:</strong> ${escapeHtml(chemical)} ${dosage ? `(${escapeHtml(dosage)})` : ''}
+          <strong style="display: flex; align-items: center; gap: 4px;">${SVG_ICONS.chemical} Chemical Remedy:</strong>
+          <span>${escapeHtml(chemical)} ${dosage ? `(${escapeHtml(dosage)})` : ''}</span>
         </div>` : ''}
       </div>
       ${waiting ? `
@@ -1081,20 +1193,20 @@ function buildQuickChips(extra, text) {
 
   if (cropKeys.length > 1) {
     for (const c of cropKeys.slice(0, 3)) {
-      const icon = CROP_ICONS[c.toLowerCase()] || "🔍";
+      const icon = getCropSvg(c);
       const name = capitalize(c);
-      chips.push({ label: `${icon} ${name} Rate`, query: `What is the current mandi rate of ${c}?` });
+      chips.push({ icon, label: `${name} Rate`, query: `What is the current mandi rate of ${c}?` });
     }
   }
 
   if (extra.evaluated_mandis && extra.evaluated_mandis.length > 0) {
-    chips.push({ label: "📄 Send Mandi Slip", query: "send today's mandi receipt summary" });
-    chips.push({ label: "⚖️ eNAM 0% Rights", query: "what is farmer zero percent commission right under eNAM?" });
+    chips.push({ icon: SVG_ICONS.document, label: "Send Mandi Slip", query: "send today's mandi receipt summary" });
+    chips.push({ icon: SVG_ICONS.scale, label: "eNAM 0% Rights", query: "what is farmer zero percent commission right under eNAM?" });
   }
 
   if (extra.icar_facts && (extra.icar_facts.chemical_cure || extra.icar_facts.organic_cure)) {
-    chips.push({ label: "🌿 Organic Spray Guide", query: "how to apply organic treatment?" });
-    chips.push({ label: "⏱️ Best Spray Time", query: "what is the ideal time for spraying?" });
+    chips.push({ icon: SVG_ICONS.organic, label: "Organic Spray Guide", query: "how to apply organic treatment?" });
+    chips.push({ icon: SVG_ICONS.clock, label: "Best Spray Time", query: "what is the ideal time for spraying?" });
   }
 
   if (chips.length === 0) {
@@ -1103,6 +1215,7 @@ function buildQuickChips(extra, text) {
 
   const chipsHtml = chips.map(c => `
     <button class="quick-chip" onclick="handleQuickChipClick('${escapeHtml(c.query)}')">
+      ${c.icon ? `<span class="chip-svg-wrap">${c.icon}</span>` : ''}
       <span>${escapeHtml(c.label)}</span>
     </button>
   `).join("");
@@ -1562,7 +1675,7 @@ function startBrowserSpeechRecognition() {
       }
       liveTranscribedText = sanitizeAntiUrdu((final + interim).trim());
       if (liveTranscribedText && turnStatusText && isRecording) {
-        turnStatusText.innerText = `🎙️ "${liveTranscribedText}"`;
+        turnStatusText.innerText = `"${liveTranscribedText}"`;
       }
     };
 
@@ -1604,6 +1717,7 @@ async function toggleMicrophone() {
 async function startMicrophoneRecording() {
   try {
     liveTranscribedText = "";
+    SoundFX.playMicClick();
     startBrowserSpeechRecognition();
 
     if (!audioContext) {
@@ -1633,7 +1747,7 @@ async function startMicrophoneRecording() {
     speechStartTime = 0;
     isRecording = true;
 
-    setTurnState("recording", "🎙️ Listening... speak now (tap when finished)");
+    setTurnState("recording", "Listening... Speak in any language");
 
     audioProcessor.onaudioprocess = (e) => {
       if (!isRecording) return;
@@ -1650,12 +1764,22 @@ async function startMicrophoneRecording() {
       const rms = Math.sqrt(sum / inputData.length);
       const now = performance.now();
 
+      // Real-time dynamic audio equalizer reactive feedback
+      const waveBars = document.querySelectorAll(".wave-bar");
+      if (waveBars.length > 0) {
+        const factor = Math.min(Math.max((rms - 0.003) * 30, 0.4), 2.2);
+        waveBars.forEach((bar, idx) => {
+          const stagger = 0.75 + ((idx % 3) * 0.25);
+          bar.style.transform = `scaleY(${factor * stagger})`;
+        });
+      }
+
       // Soft threshold (0.005) ensures whispering or soft consonants are caught
       if (rms > 0.005) {
         isSpeaking = true;
         silenceStartTime = 0;
         if (!liveTranscribedText && turnStatusText) {
-          turnStatusText.innerText = "🎙️ Listening... (tap mic when done)";
+          turnStatusText.innerText = "Listening... Speak clearly";
         }
       } else {
         if (isSpeaking) {
@@ -1985,8 +2109,8 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.setItem("kisan_auth_location", activeLocation);
             localStorage.setItem("kisan_lat", activeLat);
             localStorage.setItem("kisan_lon", activeLon);
-            if (permLocationDesc) permLocationDesc.innerText = `✓ Verified: ${activeLocation}`;
-            btnAllowLocation.innerText = "✓ Granted";
+            if (permLocationDesc) permLocationDesc.innerText = `Verified: ${activeLocation}`;
+            btnAllowLocation.innerText = "Granted";
             btnAllowLocation.classList.add("granted");
             if (permLocationCard) permLocationCard.classList.add("granted");
           },
@@ -1998,8 +2122,8 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.setItem("kisan_auth_location", activeLocation);
             localStorage.setItem("kisan_lat", activeLat);
             localStorage.setItem("kisan_lon", activeLon);
-            if (permLocationDesc) permLocationDesc.innerText = "✓ Default: Hardaspur, Punjab";
-            btnAllowLocation.innerText = "✓ Set";
+            if (permLocationDesc) permLocationDesc.innerText = "Default: Hardaspur, Punjab";
+            btnAllowLocation.innerText = "Set";
             btnAllowLocation.classList.add("granted");
             if (permLocationCard) permLocationCard.classList.add("granted");
           },
@@ -2012,8 +2136,8 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("kisan_auth_location", activeLocation);
         localStorage.setItem("kisan_lat", activeLat);
         localStorage.setItem("kisan_lon", activeLon);
-        if (permLocationDesc) permLocationDesc.innerText = "✓ Default: Hardaspur, Punjab";
-        btnAllowLocation.innerText = "✓ Set";
+        if (permLocationDesc) permLocationDesc.innerText = "Default: Hardaspur, Punjab";
+        btnAllowLocation.innerText = "Set";
         btnAllowLocation.classList.add("granted");
         if (permLocationCard) permLocationCard.classList.add("granted");
       }
@@ -2025,10 +2149,10 @@ document.addEventListener("DOMContentLoaded", () => {
     btnAllowMic.addEventListener("click", () => {
       navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
         mediaStream = stream;
-        btnAllowMic.innerText = "✓ Ready";
+        btnAllowMic.innerText = "Ready";
         btnAllowMic.classList.add("granted");
         if (permMicCard) permMicCard.classList.add("granted");
-        if (permMicDesc) permMicDesc.innerText = "✓ Microphone access granted.";
+        if (permMicDesc) permMicDesc.innerText = "Microphone access granted.";
       }).catch((err) => {
         btnAllowMic.innerText = "Retry";
         if (permMicDesc) permMicDesc.innerText = "Please allow mic in browser settings.";
