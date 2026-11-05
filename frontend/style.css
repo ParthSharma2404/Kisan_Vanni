@@ -2241,7 +2241,7 @@ html, body {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(0.72);
   width: 420px;
   height: 420px;
   border-radius: 50%;
@@ -2249,7 +2249,15 @@ html, body {
   background: radial-gradient(circle, rgba(167, 243, 208, 0.48) 0%, rgba(236, 253, 245, 0.24) 50%, transparent 75%);
   filter: blur(65px);
   z-index: 1;
+  opacity: 0;
+  transition: transform 0.44s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.38s ease;
+}
+
+.voice-modal-overlay.active .voice-ambient-light-glow {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 0.85;
   animation: ambient-sky-pulse 6s ease-in-out infinite alternate;
+  transition: transform 0.52s cubic-bezier(0.16, 1, 0.3, 1) 0.02s, opacity 0.44s ease 0.02s;
 }
 
 @keyframes ambient-sky-pulse {
@@ -2257,13 +2265,23 @@ html, body {
   100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.9; }
 }
 
-/* Top bar (Light Theme) */
+/* Top bar (Light Theme) - slides down gracefully on entrance, retreats up on exit */
 .voice-fullscreen-topbar {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   z-index: 2;
+  transform: translateY(-16px);
+  opacity: 0;
+  transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  will-change: transform, opacity;
+}
+
+.voice-modal-overlay.active .voice-fullscreen-topbar {
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 0.46s cubic-bezier(0.16, 1, 0.3, 1) 0.03s, opacity 0.4s ease 0.03s;
 }
 
 .voice-topbar-status {
@@ -2314,6 +2332,7 @@ html, body {
 }
 
 /* Middle Center Stage (Where Image 2's concentric Krishi green sound ball lives) */
+/* Organic scale bloom on appearance, gentle contraction on departure */
 .voice-fullscreen-center {
   flex: 1;
   display: flex;
@@ -2322,15 +2341,28 @@ html, body {
   width: 100%;
   position: relative;
   z-index: 2;
+  transform: scale(0.80);
+  opacity: 0;
+  transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.32s ease;
+  will-change: transform, opacity;
+  overflow: visible;
+}
+
+.voice-modal-overlay.active .voice-fullscreen-center {
+  transform: scale(1);
+  opacity: 1;
+  transition: transform 0.52s cubic-bezier(0.16, 1, 0.3, 1) 0.05s, opacity 0.44s ease 0.05s;
 }
 
 .voice-orb-canvas {
-  width: 340px;
-  height: 340px;
+  width: 380px;
+  height: 380px;
+  max-width: 92vw;
+  max-height: 92vw;
   display: block;
 }
 
-/* Bottom Useful Action Dock (Light Theme) */
+/* Bottom Useful Action Dock (Light Theme) - glides up on entrance, retreats on exit */
 .voice-fullscreen-bottom {
   width: 100%;
   display: flex;
@@ -2338,6 +2370,16 @@ html, body {
   align-items: center;
   gap: 16px;
   z-index: 2;
+  transform: translateY(22px);
+  opacity: 0;
+  transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  will-change: transform, opacity;
+}
+
+.voice-modal-overlay.active .voice-fullscreen-bottom {
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 0.48s cubic-bezier(0.16, 1, 0.3, 1) 0.07s, opacity 0.42s ease 0.07s;
 }
 
 .voice-bottom-hint {

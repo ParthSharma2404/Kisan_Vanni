@@ -739,9 +739,12 @@ const VoiceOrbVisualizer = {
   resize() {
     if (!this.canvas) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    const rect = this.canvas.getBoundingClientRect();
-    const w = rect.width > 0 ? rect.width : 340;
-    const h = rect.height > 0 ? rect.height : 340;
+    // Use offsetWidth/offsetHeight (unaffected by CSS scale transforms) to ensure exact bitmap coordinates
+    const parent = this.canvas.parentElement;
+    const parentW = parent ? parent.clientWidth : 0;
+    const parentH = parent ? parent.clientHeight : 0;
+    const w = this.canvas.offsetWidth || parentW || 380;
+    const h = this.canvas.offsetHeight || parentH || 380;
     this.canvas.width = Math.floor(w * dpr);
     this.canvas.height = Math.floor(h * dpr);
     if (this.ctx) {
@@ -800,16 +803,18 @@ const VoiceOrbVisualizer = {
 
     // Harmonic radial breathing - pure circular concentric geometry
     const breath = Math.sin(t * 0.85) * 2.0;
-    const R_core = 40 + breath * 0.5 + rms * 8;
-    const R_max = 135 + breath * 1.0 + rms * 20;
+
+    // Guaranteed safety margin: animation stays comfortably inside canvas with zero edge clipping
+    const maxSafeRadius = Math.min(cx, cy) * 0.72;
+    const R_core = maxSafeRadius * 0.28 + breath * 0.5 + rms * 6;
+    const R_max = maxSafeRadius * 0.85 + breath * 1.0 + rms * 10;
     const N = 10;
     const steps = 90;
 
-    // Render 10 concentric stepped radial layers from outermost (pale honeydew) to innermost (rich krishi emerald)
-    // EXACT concentric stepped geometry matching Kisan Vaani green theme
+    // Render 10 concentric stepped radial layers from outermost (dissolves to alpha=0) to innermost (rich krishi emerald)
     for (let k = N - 1; k >= 0; k--) {
       const ratio = k / (N - 1);
-      const baseR = R_core + ratio * (R_max - R_core) + rms * 14 * (1 - ratio * 0.35);
+      const baseR = R_core + ratio * (R_max - R_core) + rms * 6 * (1 - ratio * 0.4);
 
       // Color gradation matching Kisan Vaani Krishi Emerald theme on white background:
       // Core (ratio=0): Rich Vibrant Krishi Emerald rgb(16, 150, 95)
@@ -817,13 +822,15 @@ const VoiceOrbVisualizer = {
       const red = Math.round(16 * (1 - ratio) + 236 * ratio);
       const green = Math.round(150 * (1 - ratio) + 253 * ratio);
       const blue = Math.round(95 * (1 - ratio) + 245 * ratio);
-      const layerAlpha = Math.pow(1 - ratio, 0.75) * 0.85 + 0.15;
+
+      // Outermost layer (ratio=1) fades completely to alpha 0.0, seamlessly dissolving into background with zero hard borders
+      const layerAlpha = Math.pow(1 - ratio, 1.15) * 0.92;
 
       ctx.beginPath();
       for (let i = 0; i <= steps; i++) {
         const theta = (i / steps) * Math.PI * 2;
-        // Subtle micro liquid shimmer - maintains perfect circular serenity without cheap distortion
-        const shimmer = Math.sin(theta * 8 + t * 2.0 + k * 0.4) * (0.35 + rms * 1.6);
+        // Subtle micro liquid shimmer - pure circular serenity without cutting or jagged lobes
+        const shimmer = Math.sin(theta * 6 + t * 1.8 + k * 0.35) * (0.3 + rms * 0.8);
         const r = baseR + shimmer;
         const x = cx + r * Math.cos(theta);
         const y = cy + r * Math.sin(theta);
@@ -833,7 +840,7 @@ const VoiceOrbVisualizer = {
       }
       ctx.closePath();
 
-      // Soft filled disc - zero harsh borders, melts into white backdrop
+      // Soft filled disc - zero harsh borders, dissolves smoothly into white backdrop
       ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${layerAlpha.toFixed(3)})`;
       ctx.fill();
     }
@@ -853,7 +860,13 @@ const VoiceOrbVisualizer = {
   }
 };
 
+let voiceModalCloseTimer = null;
+
 function openVoiceModal() {
+  if (voiceModalCloseTimer) {
+    clearTimeout(voiceModalCloseTimer);
+    voiceModalCloseTimer = null;
+  }
   const overlay = document.getElementById("voiceModalOverlay");
   const viewport = document.querySelector(".app-viewport");
   if (viewport) viewport.classList.add("voice-mode-active");
@@ -864,23 +877,34 @@ function openVoiceModal() {
   }
   if (!overlay) return;
   overlay.style.display = "flex";
-  void overlay.offsetWidth; // Force reflow
+  void overlay.offsetWidth; // Force layout reflow so initial state is rendered before .active is applied
   overlay.classList.add("active");
   overlay.setAttribute("aria-hidden", "false");
   VoiceOrbVisualizer.start();
 }
 
 function closeVoiceModal() {
+  if (voiceModalCloseTimer) {
+    clearTimeout(voiceModalCloseTimer);
+    voiceModalCloseTimer = null;
+  }
   const overlay = document.getElementById("voiceModalOverlay");
   const viewport = document.querySelector(".app-viewport");
   if (viewport) viewport.classList.remove("voice-mode-active");
-  VoiceOrbVisualizer.stop();
+  
   if (overlay) {
     overlay.classList.remove("active");
     overlay.setAttribute("aria-hidden", "true");
-    setTimeout(() => {
-      if (!isRecording) overlay.style.display = "none";
-    }, 450);
+    // Allow the 0.42s exit transition to finish gracefully before stopping canvas and hiding overlay
+    voiceModalCloseTimer = setTimeout(() => {
+      if (!isRecording) {
+        VoiceOrbVisualizer.stop();
+        overlay.style.display = "none";
+      }
+      voiceModalCloseTimer = null;
+    }, 420);
+  } else {
+    VoiceOrbVisualizer.stop();
   }
 }
 
