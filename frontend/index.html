@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=31">
+  <link rel="stylesheet" href="style.css?v=48">
 </head>
 <body class="ai-buddy-body">
   <!-- Faint topographic background contours -->
@@ -144,12 +144,6 @@
       <!-- Turn Status Banner -->
       <div class="turn-status-bar ready" id="turnStatusBar">
         <span class="status-indicator-dot" id="turnIndicatorDot"></span>
-        <div class="audio-wave-bars" id="audioWaveBars" style="display: none;">
-          <span class="wave-bar"></span>
-          <span class="wave-bar"></span>
-          <span class="wave-bar"></span>
-          <span class="wave-bar"></span>
-        </div>
         <span id="turnStatusText">Mic ready • Tap to speak or type</span>
       </div>
 
@@ -179,8 +173,10 @@
           </button>
         </form>
 
-        <!-- Turn-Controlled Dynamic Neon Mic Button -->
+        <!-- Turn-Controlled Dynamic Neon Mic Button with Acoustic Ripple Aura -->
         <div class="mic-button-wrapper" id="micWrapper">
+          <div class="mic-ripple-ring ring-1"></div>
+          <div class="mic-ripple-ring ring-2"></div>
           <button id="mainMicBtn" class="dock-mic-btn ready" title="Click to speak" aria-label="Microphone">
             <span id="micIconHolder">
               <svg class="mic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
@@ -194,6 +190,68 @@
         </div>
       </div>
     </footer>
+
+    <!-- Full-Screen Immersive Voice Overlay (Clean Light Theme) -->
+    <div id="voiceModalOverlay" class="voice-modal-overlay light-theme" style="display: none;" aria-hidden="true">
+      <!-- Soft Ethereal Ambient Sky Aura -->
+      <div class="voice-ambient-light-glow"></div>
+
+      <!-- Top Status Header with Cancel Button -->
+      <div class="voice-fullscreen-topbar">
+        <div class="voice-topbar-status">
+          <span class="voice-topbar-dot"></span>
+          <span class="voice-topbar-text">Listening to your voice...</span>
+        </div>
+        <button type="button" id="btnCancelVoiceTop" class="voice-topbar-close-btn" title="Cancel voice input" aria-label="Cancel voice input">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Center Stage: Concentric Harmonic Ball (Zero borders, blends seamlessly into dark background) -->
+      <div class="voice-fullscreen-center">
+        <canvas id="voiceOrbCanvas" class="voice-orb-canvas" width="340" height="340"></canvas>
+      </div>
+
+      <!-- Bottom Useful Action Dock -->
+      <div class="voice-fullscreen-bottom">
+        <div class="voice-bottom-hint" id="voiceBottomHint">
+          Speak in Hindi, Punjabi or your language • Auto-submits on pause
+        </div>
+
+        <div class="voice-action-dock">
+          <!-- Discard / Cancel Button -->
+          <button type="button" id="btnCancelVoiceBottom" class="voice-dock-btn voice-dock-cancel" title="Discard and cancel">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span>Cancel</span>
+          </button>
+
+          <!-- Primary Tactile Done / Send Button (High-End White Porcelain Finish) -->
+          <button type="button" id="btnFinishVoiceModal" class="voice-dock-btn voice-dock-done" title="Finish and submit query" aria-label="Finish and send">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="19" x2="12" y2="5"></line>
+              <polyline points="5 12 12 5 19 12"></polyline>
+            </svg>
+            <span class="voice-done-label">Done</span>
+          </button>
+
+          <!-- Quick Language Switcher Button -->
+          <button type="button" id="btnVoiceLang" class="voice-dock-btn voice-dock-lang" title="Switch voice language">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span id="voiceModalLangLabel">Hindi</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ONBOARDING & LOGIN MODAL: Multi-Step Permissions Gate -->
@@ -353,6 +411,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=31"></script>
+  <script src="app.js?v=48"></script>
 </body>
 </html>

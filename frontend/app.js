@@ -230,6 +230,38 @@ const SoundFX = {
     } catch (e) {}
   },
 
+  // Ethereal dual-harmonic crystal chime on voice mode activation
+  playMicOpen() {
+    try {
+      this.init();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc1 = this.ctx.createOscillator();
+      const osc2 = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc1.type = "sine";
+      osc2.type = "sine";
+      osc1.frequency.setValueAtTime(523.25, now); // C5
+      osc1.frequency.exponentialRampToValueAtTime(783.99, now + 0.12); // G5
+      osc2.frequency.setValueAtTime(659.25, now); // E5
+      osc2.frequency.exponentialRampToValueAtTime(1046.50, now + 0.15); // C6
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.23);
+      osc2.stop(now + 0.23);
+    } catch (e) {}
+  },
+
   // Tactile, crisp modern pop on user message dispatch
   playSend() {
     try {
@@ -684,6 +716,175 @@ async function loadTodayChatHistory() {
 }
 
 // =====================================================================
+// CONCENTRIC HARMONIC SOUND AURA (Inspired by Image 2 / Stepped Sonic Radial Disc)
+// Zero borders, pure soft radial blending, dissolves seamlessly into dark background
+// =====================================================================
+const VoiceOrbVisualizer = {
+  canvas: null,
+  ctx: null,
+  animId: null,
+  phase: 0,
+  currentRms: 0.01,
+  targetRms: 0.01,
+  isRunning: false,
+
+  init() {
+    this.canvas = document.getElementById("voiceOrbCanvas");
+    if (!this.canvas) return;
+    this.ctx = this.canvas.getContext("2d");
+    this.resize();
+    window.addEventListener("resize", () => this.resize());
+  },
+
+  resize() {
+    if (!this.canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const rect = this.canvas.getBoundingClientRect();
+    const w = rect.width > 0 ? rect.width : 340;
+    const h = rect.height > 0 ? rect.height : 340;
+    this.canvas.width = Math.floor(w * dpr);
+    this.canvas.height = Math.floor(h * dpr);
+    if (this.ctx) {
+      this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      this.ctx.scale(dpr, dpr);
+    }
+  },
+
+  start() {
+    if (!this.canvas) this.init();
+    if (this.isRunning) return;
+    this.isRunning = true;
+    this.phase = 0;
+    this.currentRms = 0.01;
+    this.targetRms = 0.01;
+    this.resize();
+    this.render();
+  },
+
+  stop() {
+    this.isRunning = false;
+    if (this.animId) {
+      cancelAnimationFrame(this.animId);
+      this.animId = null;
+    }
+    if (this.ctx && this.canvas) {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+      this.ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
+    }
+  },
+
+  setVolume(rms) {
+    this.targetRms = Math.min(Math.max((rms - 0.003) * 22, 0), 1.0);
+  },
+
+  render() {
+    if (!this.isRunning) return;
+    const ctx = this.ctx;
+    if (!ctx || !this.canvas) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const width = this.canvas.width / dpr;
+    const height = this.canvas.height / dpr;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Smooth vocal RMS tracking
+    this.currentRms += (this.targetRms - this.currentRms) * 0.18;
+    const rms = this.currentRms;
+
+    // Serene acoustic phase progression
+    this.phase += 0.020 + rms * 0.045;
+    const t = this.phase;
+
+    // Harmonic radial breathing - pure circular concentric geometry
+    const breath = Math.sin(t * 0.85) * 2.0;
+    const R_core = 40 + breath * 0.5 + rms * 8;
+    const R_max = 135 + breath * 1.0 + rms * 20;
+    const N = 10;
+    const steps = 90;
+
+    // Render 10 concentric stepped radial layers from outermost (pale honeydew) to innermost (rich krishi emerald)
+    // EXACT concentric stepped geometry matching Kisan Vaani green theme
+    for (let k = N - 1; k >= 0; k--) {
+      const ratio = k / (N - 1);
+      const baseR = R_core + ratio * (R_max - R_core) + rms * 14 * (1 - ratio * 0.35);
+
+      // Color gradation matching Kisan Vaani Krishi Emerald theme on white background:
+      // Core (ratio=0): Rich Vibrant Krishi Emerald rgb(16, 150, 95)
+      // Edge (ratio=1): Translucent Pale Honeydew Meadow rgb(236, 253, 245)
+      const red = Math.round(16 * (1 - ratio) + 236 * ratio);
+      const green = Math.round(150 * (1 - ratio) + 253 * ratio);
+      const blue = Math.round(95 * (1 - ratio) + 245 * ratio);
+      const layerAlpha = Math.pow(1 - ratio, 0.75) * 0.85 + 0.15;
+
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const theta = (i / steps) * Math.PI * 2;
+        // Subtle micro liquid shimmer - maintains perfect circular serenity without cheap distortion
+        const shimmer = Math.sin(theta * 8 + t * 2.0 + k * 0.4) * (0.35 + rms * 1.6);
+        const r = baseR + shimmer;
+        const x = cx + r * Math.cos(theta);
+        const y = cy + r * Math.sin(theta);
+
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+
+      // Soft filled disc - zero harsh borders, melts into white backdrop
+      ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${layerAlpha.toFixed(3)})`;
+      ctx.fill();
+    }
+
+    // Specular gentle light core (calming pool of depth with electric volt-lime kiss)
+    const coreGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R_core * 0.95);
+    coreGlow.addColorStop(0, `rgba(255, 255, 255, ${0.45 + rms * 0.25})`);
+    coreGlow.addColorStop(0.35, `rgba(200, 255, 47, ${0.30 + rms * 0.18})`);
+    coreGlow.addColorStop(0.70, `rgba(167, 243, 208, ${0.20 + rms * 0.12})`);
+    coreGlow.addColorStop(1, "rgba(16, 150, 95, 0)");
+    ctx.fillStyle = coreGlow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R_core * 0.95, 0, Math.PI * 2);
+    ctx.fill();
+
+    this.animId = requestAnimationFrame(() => this.render());
+  }
+};
+
+function openVoiceModal() {
+  const overlay = document.getElementById("voiceModalOverlay");
+  const viewport = document.querySelector(".app-viewport");
+  if (viewport) viewport.classList.add("voice-mode-active");
+  // Silent entrance - zero audio chimes/tones played
+  const langLabel = document.getElementById("voiceModalLangLabel");
+  if (langLabel && LANGUAGE_LABELS) {
+    langLabel.innerText = LANGUAGE_LABELS[currentLanguage] || "Hindi";
+  }
+  if (!overlay) return;
+  overlay.style.display = "flex";
+  void overlay.offsetWidth; // Force reflow
+  overlay.classList.add("active");
+  overlay.setAttribute("aria-hidden", "false");
+  VoiceOrbVisualizer.start();
+}
+
+function closeVoiceModal() {
+  const overlay = document.getElementById("voiceModalOverlay");
+  const viewport = document.querySelector(".app-viewport");
+  if (viewport) viewport.classList.remove("voice-mode-active");
+  VoiceOrbVisualizer.stop();
+  if (overlay) {
+    overlay.classList.remove("active");
+    overlay.setAttribute("aria-hidden", "true");
+    setTimeout(() => {
+      if (!isRecording) overlay.style.display = "none";
+    }, 450);
+  }
+}
+
+// =====================================================================
 // 2. TURN-TAKING MIC STATE MACHINE
 // =====================================================================
 function setTurnState(state, message = "") {
@@ -691,15 +892,10 @@ function setTurnState(state, message = "") {
     turnStatusBar.className = `turn-status-bar ${state}`;
   }
 
-  const audioWaveBars = document.getElementById("audioWaveBars");
   if (state === "recording") {
-    if (audioWaveBars) audioWaveBars.style.display = "inline-flex";
+    openVoiceModal();
   } else {
-    if (audioWaveBars) {
-      audioWaveBars.style.display = "none";
-      const bars = audioWaveBars.querySelectorAll(".wave-bar");
-      bars.forEach(b => { b.style.transform = ""; });
-    }
+    closeVoiceModal();
   }
 
   if (state === "speaking") {
@@ -731,7 +927,7 @@ function setTurnState(state, message = "") {
     // Farmer is actively speaking
     isAiSpeaking = false;
     if (reasoningIndicator) reasoningIndicator.style.display = "none";
-    if (turnStatusText) turnStatusText.innerText = message || "Listening...";
+    if (turnStatusText) turnStatusText.innerText = "";
     if (mainMicBtn) {
       mainMicBtn.className = "dock-mic-btn recording";
       mainMicBtn.setAttribute("title", "Tap when finished speaking");
@@ -1390,6 +1586,15 @@ window.replayAiText = function(btn) {
 // =====================================================================
 // 4. WEBSOCKET REAL-TIME CONNECTION
 // =====================================================================
+function isGreetingMessage(t) {
+  if (!t) return false;
+  const lower = t.toLowerCase();
+  return lower.includes("welcome to kisan-vaani") ||
+         lower.includes("how can i assist you with mandi prices") ||
+         (lower.includes("namaste") && (lower.includes("boliye") || lower.includes("madad"))) ||
+         (lower.includes("sat sri akal") && lower.includes("dasso"));
+}
+
 function connectWebSocket() {
   if (socket && socket.readyState === WebSocket.OPEN) return;
 
@@ -1400,6 +1605,20 @@ function connectWebSocket() {
 
     socket.onopen = () => {
       console.log("[WebSocket] Connected successfully");
+      const todayKey = getTodayDateKey();
+      const storageKey = `kisan_chat_${activePhone}_${todayKey}`;
+      let hasHistory = false;
+      try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) hasHistory = true;
+        }
+      } catch (e) {}
+      if (dynamicMessagesContainer && dynamicMessagesContainer.children.length > 0) {
+        hasHistory = true;
+      }
+
       socket.send(JSON.stringify({
         type: "start_call",
         session_id: sessionId,
@@ -1408,7 +1627,8 @@ function connectWebSocket() {
         location: activeLocation,
         latitude: activeLat,
         longitude: activeLon,
-        language: currentLanguage
+        language: currentLanguage,
+        has_existing_history: hasHistory
       }));
       setTurnState("ready");
     };
@@ -1443,7 +1663,7 @@ function handleServerEvent(data) {
     setTurnState("ready");
   } 
   else if (type === "vad_state") {
-    if (data.state === "reasoning") {
+    if (data.state === "reasoning" || data.state === "synthesizing") {
       setTurnState("reasoning", data.message);
     } else if (data.state === "listening") {
       setTurnState("ready");
@@ -1460,7 +1680,8 @@ function handleServerEvent(data) {
           clearTimeout(pendingTextTimeout);
           pendingTextTimeout = null;
         }
-        if (text.includes("Namaste Kisan Bhai ji, boliye") && dynamicMessagesContainer && dynamicMessagesContainer.children.length > 0) {
+        isSubmittingText = false;
+        if (isGreetingMessage(text) && dynamicMessagesContainer && dynamicMessagesContainer.children.length > 0) {
           return;
         }
         SoundFX.playReceive();
@@ -1475,12 +1696,15 @@ function handleServerEvent(data) {
       clearTimeout(pendingTextTimeout);
       pendingTextTimeout = null;
     }
-    // Avoid duplicate greetings on reconnect
-    if (text.includes("Namaste Kisan Bhai ji, boliye") && dynamicMessagesContainer && dynamicMessagesContainer.children.length > 0) {
+    isSubmittingText = false;
+
+    // Suppress redundant greeting cards & audio when session history already exists
+    if (isGreetingMessage(text) && dynamicMessagesContainer && dynamicMessagesContainer.children.length > 0) {
+      setTurnState("ready");
       return;
     }
 
-    // Check if card was already rendered by transcript event
+    // Check if card was already rendered
     const aiRows = dynamicMessagesContainer ? Array.from(dynamicMessagesContainer.querySelectorAll(".ai-row")) : [];
     let existingCard = null;
     for (let i = aiRows.length - 1; i >= 0; i--) {
@@ -1492,11 +1716,13 @@ function handleServerEvent(data) {
     }
 
     if (existingCard) {
+      // Historical or pre-existing card: attach audio data for manual replay ONLY; NEVER auto-play
       const audioBtn = existingCard.querySelector(".btn-card-audio");
       if (audioBtn && data.audio_base64) {
         audioBtn.setAttribute("data-audio", data.audio_base64);
-        playGnaniAudio(text, data.audio_base64, audioBtn);
       }
+      setTurnState("ready");
+      return;
     } else {
       SoundFX.playReceive();
       renderAiCard(text, data.data || {}, true, data.audio_base64 || "");
@@ -1764,27 +1990,17 @@ async function startMicrophoneRecording() {
       const rms = Math.sqrt(sum / inputData.length);
       const now = performance.now();
 
-      // Real-time dynamic audio equalizer reactive feedback
-      const waveBars = document.querySelectorAll(".wave-bar");
-      if (waveBars.length > 0) {
-        const factor = Math.min(Math.max((rms - 0.003) * 30, 0.4), 2.2);
-        waveBars.forEach((bar, idx) => {
-          const stagger = 0.75 + ((idx % 3) * 0.25);
-          bar.style.transform = `scaleY(${factor * stagger})`;
-        });
-      }
+      // Real-time 3D voice orb reactive feedback (vocal energy modulation)
+      VoiceOrbVisualizer.setVolume(rms);
 
       // Soft threshold (0.005) ensures whispering or soft consonants are caught
       if (rms > 0.005) {
         isSpeaking = true;
         silenceStartTime = 0;
-        if (!liveTranscribedText && turnStatusText) {
-          turnStatusText.innerText = "Listening...";
-        }
       } else {
         if (isSpeaking) {
           if (silenceStartTime === 0) silenceStartTime = now;
-          else if (now - silenceStartTime > 2200) { // 2.2s natural pause threshold
+          else if (now - silenceStartTime > 1800) { // 1.8s natural pause auto-submits input seamlessly
             isSpeaking = false;
             stopRecordingAndSend();
           }
@@ -1796,6 +2012,7 @@ async function startMicrophoneRecording() {
     audioProcessor.connect(audioContext.destination);
   } catch (err) {
     console.warn("[Mic] Access error:", err);
+    closeVoiceModal();
     setTurnState("ready", "Please allow microphone access");
   }
 }
@@ -1803,6 +2020,7 @@ async function startMicrophoneRecording() {
 function stopRecording() {
   isRecording = false;
   isSpeaking = false;
+  closeVoiceModal();
   stopBrowserSpeechRecognition();
   silenceStartTime = 0;
   speechStartTime = 0;
@@ -1818,6 +2036,7 @@ function stopRecording() {
 
 function stopRecordingAndSend() {
   isRecording = false;
+  closeVoiceModal();
   stopBrowserSpeechRecognition();
 
   if (audioProcessor && audioSource) {
@@ -1953,18 +2172,20 @@ async function submitUserText() {
     SoundFX.playSend();
     setTurnState("reasoning", "Preparing answer...");
 
-    // Watchdog fallback: if WebSocket does not answer within 7 seconds, call REST endpoint directly!
-    if (pendingTextTimeout) clearTimeout(pendingTextTimeout);
-    pendingTextTimeout = setTimeout(async () => {
-      console.warn("[Chat] WebSocket response timeout (7s). Calling fallback REST /api/chat...");
-      await fetchChatFallback(text);
-    }, 7000);
-
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({
         type: "user_text",
         text: text
       }));
+
+      // Emergency safety watchdog: ONLY trigger fallback if WebSocket hangs for 45s without any response
+      if (pendingTextTimeout) clearTimeout(pendingTextTimeout);
+      pendingTextTimeout = setTimeout(async () => {
+        if (isSubmittingText) {
+          console.warn("[Chat] Emergency watchdog (45s) triggered. Calling REST /api/chat fallback...");
+          await fetchChatFallback(text);
+        }
+      }, 45000);
     } else {
       console.warn("[Chat] WebSocket not open. Calling fallback REST /api/chat immediately...");
       if (pendingTextTimeout) {
@@ -1975,10 +2196,13 @@ async function submitUserText() {
     }
   } catch (err) {
     console.error("[Chat] Error submitting text:", err);
+    isSubmittingText = false;
+    setTurnState("ready");
   } finally {
     setTimeout(() => {
-      isSubmittingText = false;
-    }, 350);
+      // Debounce window to prevent rapid double-clicks
+      if (!isAiSpeaking) isSubmittingText = false;
+    }, 1200);
   }
 }
 
@@ -2002,19 +2226,30 @@ async function fetchChatFallback(text) {
       const data = await res.json();
       const spokenText = data.spoken_text || "";
       if (spokenText) {
-        SoundFX.playReceive();
-        renderAiCard(spokenText, data.data || {}, true, data.audio_base64 || "");
-        setTurnState("ready");
-        if (data.audio_base64) {
-          playGnaniAudio(spokenText, data.audio_base64);
+        // Prevent duplicate response card & dual audio if WebSocket already delivered
+        const aiRows = dynamicMessagesContainer ? Array.from(dynamicMessagesContainer.querySelectorAll(".ai-row")) : [];
+        const alreadyRendered = aiRows.some(row => {
+          const p = row.querySelector(".card-content");
+          return p && (p.innerText.includes(spokenText.slice(0, 30)) || spokenText.includes(p.innerText.slice(0, 30)));
+        });
+
+        if (!alreadyRendered) {
+          SoundFX.playReceive();
+          renderAiCard(spokenText, data.data || {}, true, data.audio_base64 || "");
+          setTurnState("ready");
+          if (data.audio_base64) {
+            playGnaniAudio(spokenText, data.audio_base64);
+          }
         }
         return;
       }
     }
   } catch (err) {
     console.error("[Chat:Fallback] Error:", err);
+  } finally {
+    isSubmittingText = false;
+    setTurnState("ready");
   }
-  setTurnState("ready");
 }
 
 // =====================================================================
@@ -2053,6 +2288,7 @@ function showDailySummaryModal(text, url) {
 document.addEventListener("DOMContentLoaded", () => {
   initLanguageSelector();
   initSessionAndStorage();
+  VoiceOrbVisualizer.init();
 
   // Initial Weather Sync
   fetchAndRenderWeather(activeLat, activeLon, activeLocation);
@@ -2221,27 +2457,67 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Chat text form submit, button click, and Enter key
+  // Full-Screen Immersive Voice Overlay Controls
+  const btnFinishVoiceModal = document.getElementById("btnFinishVoiceModal");
+  if (btnFinishVoiceModal) {
+    btnFinishVoiceModal.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isRecording) {
+        stopRecordingAndSend();
+      }
+    });
+  }
+
+  // Cancel Buttons (Top and Bottom)
+  const handleVoiceCancel = (e) => {
+    e.stopPropagation();
+    if (isRecording) {
+      stopRecording();
+    }
+  };
+
+  const btnCancelVoiceTop = document.getElementById("btnCancelVoiceTop");
+  if (btnCancelVoiceTop) btnCancelVoiceTop.addEventListener("click", handleVoiceCancel);
+
+  const btnCancelVoiceBottom = document.getElementById("btnCancelVoiceBottom");
+  if (btnCancelVoiceBottom) btnCancelVoiceBottom.addEventListener("click", handleVoiceCancel);
+
+  // Quick Language Toggle in Voice Mode
+  const btnVoiceLang = document.getElementById("btnVoiceLang");
+  const voiceModalLangLabel = document.getElementById("voiceModalLangLabel");
+  const voiceBottomHint = document.getElementById("voiceBottomHint");
+
+  if (btnVoiceLang) {
+    const langCycle = ["hi-IN", "pa-IN", "en-US"];
+    btnVoiceLang.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const currentIdx = langCycle.indexOf(currentLanguage);
+      const nextLang = langCycle[(currentIdx + 1) % langCycle.length];
+      currentLanguage = nextLang;
+      localStorage.setItem("kisan_preferred_language", currentLanguage);
+      
+      const newLabel = LANGUAGE_LABELS[currentLanguage] || "Hindi";
+      if (voiceModalLangLabel) voiceModalLangLabel.innerText = newLabel;
+      const currentLangLabel = document.getElementById("currentLangLabel");
+      if (currentLangLabel) currentLangLabel.innerText = newLabel;
+      
+      if (voiceBottomHint) {
+        voiceBottomHint.innerText = `Language set to ${newLabel} • Auto-submits on pause`;
+      }
+    });
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && isRecording) {
+      stopRecording();
+    }
+  });
+
+  // Chat text form submit handles button click and Enter key natively
   if (chatTextForm) {
     chatTextForm.addEventListener("submit", (e) => {
       e.preventDefault();
       submitUserText();
-    });
-  }
-
-  if (sendTextBtn) {
-    sendTextBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      submitUserText();
-    });
-  }
-
-  if (chatTextInput) {
-    chatTextInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        submitUserText();
-      }
     });
   }
 

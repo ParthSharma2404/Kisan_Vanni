@@ -96,7 +96,9 @@ async def startup_prewarm():
         # 2. Pre-connect Gnani Evon client in worker thread so first query has zero latency
         loop = asyncio.get_running_loop()
         loop.run_in_executor(None, llm_service._get_evon_client)
-        print("[Startup] Live Government data sync & Gnani Evon pre-warm initiated.")
+        # 3. Pre-warm persistent Gnani Timbre TTS connection
+        asyncio.create_task(gnani_tts.pre_warm())
+        print("[Startup] Live Government data sync, Gnani Evon & Timbre TTS pre-warm initiated.")
     except Exception as e:
         print(f"[Startup] Pre-warm notice: {e}")
 

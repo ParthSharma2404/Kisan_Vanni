@@ -1201,54 +1201,23 @@ html, body {
   flex-shrink: 0;
 }
 
-/* Audio Waveform Equalizer (Active Listening Feedback) */
-.audio-wave-bars {
-  display: inline-flex;
-  align-items: center;
-  gap: 2.5px;
-  height: 14px;
-  margin: 0 4px;
-}
-
-.wave-bar {
-  width: 2.5px;
-  height: 12px;
-  background-color: var(--carbon-black);
-  border-radius: 999px;
-  animation: wave-bar-pulse 0.9s infinite ease-in-out;
-  transform-origin: center;
-  transition: transform 0.08s ease;
-}
-
-.wave-bar:nth-child(1) { height: 6px; animation-delay: 0.0s; }
-.wave-bar:nth-child(2) { height: 13px; animation-delay: 0.2s; }
-.wave-bar:nth-child(3) { height: 9px; animation-delay: 0.4s; }
-.wave-bar:nth-child(4) { height: 12px; animation-delay: 0.15s; }
-
-@keyframes wave-bar-pulse {
-  0%, 100% { transform: scaleY(0.4); opacity: 0.6; }
-  50% { transform: scaleY(1.15); opacity: 1; }
-}
-
-/* Status States - Clean Carbon Scandinavian Tone */
+/* Status States - Clean Minimalist Tone (Zero Boxes / Zero Borders when recording) */
 .turn-status-bar.speaking {
   color: var(--carbon-black);
 }
 .turn-status-bar.speaking .status-indicator-dot {
   display: none;
 }
-.turn-status-bar.speaking .wave-bar {
-  background-color: var(--carbon-black);
-}
 
 .turn-status-bar.recording {
   color: var(--carbon-black);
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 .turn-status-bar.recording .status-indicator-dot {
   display: none;
-}
-.turn-status-bar.recording .wave-bar {
-  background-color: var(--carbon-black);
 }
 
 .input-dock-row {
@@ -1334,6 +1303,39 @@ html, body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+/* Concentric Acoustic Aura Rings (Expanding ripples behind mic button) */
+.mic-ripple-ring {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(200, 255, 47, 0.65);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(1);
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+
+.mic-button-wrapper:has(.dock-mic-btn.recording) .mic-ripple-ring.ring-1 {
+  animation: mic-aurora-ripple 2.0s infinite cubic-bezier(0.1, 0.6, 0.3, 1);
+}
+
+.mic-button-wrapper:has(.dock-mic-btn.recording) .mic-ripple-ring.ring-2 {
+  animation: mic-aurora-ripple 2.0s infinite cubic-bezier(0.1, 0.6, 0.3, 1) 0.9s;
+}
+
+@keyframes mic-aurora-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.85);
+    opacity: 0;
+  }
 }
 
 .dock-mic-btn {
@@ -2183,4 +2185,240 @@ html, body {
   width: 100%;
   height: auto;
   display: block;
+}
+
+/* =====================================================================
+   TRANSLUCENT BOTTOM VOICE SHEET (Apple / Gemini Live Bottom Sheet)
+   Contained strictly inside .app-viewport - slides up from bottom
+   ===================================================================== */
+/* =====================================================================
+   CINEMATIC BACKGROUND DEPTH-OF-FIELD (Voice Mode Activation)
+   ===================================================================== */
+.app-viewport > *:not(.voice-modal-overlay) {
+  transition: transform 0.48s cubic-bezier(0.16, 1, 0.3, 1), filter 0.48s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center 35%;
+}
+
+.app-viewport.voice-mode-active > *:not(.voice-modal-overlay) {
+  transform: scale(0.965);
+  filter: blur(20px) brightness(0.72);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* =====================================================================
+   FULL-SCREEN IMMERSIVE VOICE EXPERIENCE (Crisp Pure Light Theme)
+   Airy frosted white atmosphere with Kisan Vaani's serene emerald concentric ball
+   ===================================================================== */
+.voice-modal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  opacity: 0;
+  background: 
+    radial-gradient(circle at 50% 50%, rgba(236, 253, 245, 0.65) 0%, rgba(240, 253, 244, 0.38) 50%, transparent 80%),
+    rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  padding: 24px 20px 28px 20px;
+  box-sizing: border-box;
+}
+
+.voice-modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Soft Ethereal Ambient Meadow Aura (Clean, luminous Kisan Vaani light glow) */
+.voice-ambient-light-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(167, 243, 208, 0.48) 0%, rgba(236, 253, 245, 0.24) 50%, transparent 75%);
+  filter: blur(65px);
+  z-index: 1;
+  animation: ambient-sky-pulse 6s ease-in-out infinite alternate;
+}
+
+@keyframes ambient-sky-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.92); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.9; }
+}
+
+/* Top bar (Light Theme) */
+.voice-fullscreen-topbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 2;
+}
+
+.voice-topbar-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voice-topbar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.55);
+  animation: pulse-top-dot 1.4s infinite ease-in-out;
+}
+
+@keyframes pulse-top-dot {
+  0%, 100% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+
+.voice-topbar-text {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: #1e293b;
+}
+
+.voice-topbar-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.voice-topbar-close-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+  transform: scale(1.05);
+}
+
+/* Middle Center Stage (Where Image 2's concentric Krishi green sound ball lives) */
+.voice-fullscreen-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+.voice-orb-canvas {
+  width: 340px;
+  height: 340px;
+  display: block;
+}
+
+/* Bottom Useful Action Dock (Light Theme) */
+.voice-fullscreen-bottom {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  z-index: 2;
+}
+
+.voice-bottom-hint {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #64748b;
+  text-align: center;
+  letter-spacing: -0.1px;
+}
+
+.voice-action-dock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.voice-dock-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+  font-family: var(--font-family);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+/* Cancel Button (Light Theme) */
+.voice-dock-cancel {
+  padding: 12px 18px;
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #334155;
+}
+.voice-dock-cancel:hover {
+  background: rgba(0, 0, 0, 0.09);
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+/* Primary Tactile Done Button (Solid Midnight Carbon with subtle emerald glow) */
+.voice-dock-done {
+  flex: 1;
+  max-width: 140px;
+  padding: 12.5px 22px;
+  background: #09170c;
+  border: 1px solid #09170c;
+  color: #ffffff;
+  box-shadow: 
+    0 4px 16px rgba(9, 23, 12, 0.25),
+    0 10px 24px rgba(16, 185, 129, 0.15);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: -0.2px;
+}
+.voice-dock-done:hover {
+  background: #040c06;
+  box-shadow: 
+    0 6px 20px rgba(16, 185, 129, 0.35),
+    0 12px 28px rgba(9, 23, 12, 0.2);
+  transform: translateY(-1.5px);
+}
+.voice-dock-done:active {
+  transform: scale(0.96);
+}
+
+/* Language Switcher (Light Theme) */
+.voice-dock-lang {
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #334155;
+}
+.voice-dock-lang:hover {
+  background: rgba(0, 0, 0, 0.09);
+  color: #0f172a;
+  transform: translateY(-1px);
 }

@@ -8,7 +8,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.config import settings
 from app.services.dialogue_manager import dialogue_manager
 from app.services.gnani_stt import gnani_stt
-from app.services.gnani_tts import gnani_tts
+from app.services.gnani_tts import gnani_tts, clean_for_speech
 from app.services.mandi_service import mandi_service
 from app.services.arbitrage_engine import arbitrage_engine
 from app.services.audio_dsp import acoustic_dsp
@@ -105,9 +105,17 @@ class VoiceGatewaySession:
             "silence_threshold_ms": 1800
         })
 
-        # Synthesize and deliver conversational greeting ONLY if session is fresh (no prior messages)
-        if len(dm_session.chat_history) == 0:
+        # Synthesize and deliver greeting ONLY on a fresh start of day (zero prior messages)
+        has_history = bool(data.get("has_existing_history")) or len(dm_session.chat_history) > 0
+        if not has_history:
             await self._synthesize_and_deliver(greeting_text, step=dm_session.step, extra_data={"is_new": greeting_res["is_new"], "farmer": farmer})
+        else:
+            print(f"[VoiceGateway:{self.session_id}] Existing conversation history active. Skipping greeting audio playback.")
+            await self.send_json({
+                "type": "vad_state",
+                "state": "listening",
+                "message": "Mic ready • Tap to speak or type"
+            })
 
     async def handle_speech_start(self):
         """
@@ -265,37 +273,29 @@ class VoiceGatewaySession:
         if turn_id is None:
             turn_id = self.active_turn_id
 
-        # Deliver textual transcript immediately for zero UI lag
-        await self.send_json({
-            "type": "transcript",
-            "role": "agent",
-            "text": spoken_text,
-            "step": step,
-            "data": extra_data,
-            "turn_id": turn_id
-        })
-
-        # Synthesize audio with Gnani Timbre v3.0 (with safe 6s timeout)
+        # Synthesize full neural audio with Gnani Timbre v3.0 (warm connection pool, reading full text)
         audio_b64 = None
         key_to_use = self.api_key or settings.GNANI_API_KEY
         if key_to_use and spoken_text:
             await self.send_json({
                 "type": "vad_state",
                 "state": "synthesizing",
-                "message": "Gnani Timbre v3.0: Synthesizing neural Indic speech..."
+                "message": "Synthesizing voice response..."
             })
             try:
-                # Run TTS in a cancellable task for instant barge-in support
+                # Clean full response of raw markdown for natural, fluent neural pronunciation (no truncation)
+                voice_script = clean_for_speech(spoken_text)
+
                 tts_lang = "en-IN" if (self.language or "").startswith("en") else (self.language or "hi-IN")
                 tts_voice = "Shivani"  # Official Timbre v3.0 voice supporting English (en-IN) and Indic
                 tts_coro = gnani_tts.synthesize_speech(
-                    spoken_text,
+                    voice_script,
                     lang=tts_lang,
                     voice=tts_voice,
                     api_key=key_to_use
                 )
                 self.current_tts_task = asyncio.create_task(tts_coro)
-                audio_bytes = await asyncio.wait_for(self.current_tts_task, timeout=6.0)
+                audio_bytes = await asyncio.wait_for(self.current_tts_task, timeout=9.0)
                 if audio_bytes and len(audio_bytes) > 200:
                     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
             except (asyncio.TimeoutError, asyncio.CancelledError):
@@ -308,7 +308,7 @@ class VoiceGatewaySession:
             print(f"[VoiceGateway:{self.session_id}] Voice audio discarded for obsolete turn {turn_id}")
             return
 
-        # Stream audio and response card back to client
+        # Deliver BOTH text and audio simultaneously (Hand-In-Hand with zero premature text popping)
         await self.send_json({
             "type": "agent_audio",
             "text": spoken_text,
@@ -321,7 +321,7 @@ class VoiceGatewaySession:
         await self.send_json({
             "type": "vad_state",
             "state": "speaking" if audio_b64 else "listening",
-            "message": "Gnani Timbre speaking • Barge-in active (speak anytime)" if audio_b64 else "Mic ready • Tap to speak or type"
+            "message": "Kisan Vaani speaking..." if audio_b64 else "Mic ready • Tap to speak or type"
         })
 
     def close(self):
