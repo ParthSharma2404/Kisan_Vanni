@@ -41,7 +41,7 @@ RULES:
 2. If the user mentions quantity ("20 bori", "10 kg", "5 quintal"), set intent = "QUANTITY_INPUT".
 3. If off-topic (movies, cricket, politics, crypto, coding), set intent = "OFF_TOPIC".
 4. If asking for a summary/receipt/WhatsApp message, set intent = "DAILY_SUMMARY".
-5. If the user introduces themselves or states their name, extract farmer_name.
+5. If the user introduces themselves or states their name (e.g. 'mera naam Ramesh hai', 'my name is Parth'), extract farmer_name. If the user is ASKING what their name is (e.g. 'mera naam kya hai', 'what is my name'), DO NOT extract question words like 'kya' or 'what' as farmer_name; set farmer_name = null.
 6. PRONOUN & ANAPHORA RESOLUTION: If the user refers to crops using demonstrative pronouns ("inka", "iski", "iska", "inhe", "inko", "ye", "yeh", "in faslon", "unka", "inme se") or asks "mandi mai kitna daam mill sakta hai inka?", look at the immediately preceding assistant message in the chat history. Extract the crop or crops recommended or discussed there! If multiple crops are mentioned (e.g. soybean, cotton, groundnut), set crop to all of them separated by commas (e.g. "soybean,cotton,groundnut") and set intent = "MANDI_PRICE".
 7. APMC DIRECTORY & MANDI LOOKUP: If the user asks how many APMCs or mandis exist near their location, or asks for nearby mandis or top APMCs in their state (e.g. "near my location how many APMCs are present", "top 10 location of APMC in my state", "what about amritsar APMC"), set intent = "APMC_DIRECTORY".
 8. USER OVERRIDE & RE-ASKING PRICES: If the user acknowledges cost unviability ("i get that it wouldn't be cost effective... but still list the mandis and prices", "agar APMC me bechna ho toh mandi aur price batao"), set intent = "MANDI_PRICE" and preserve the discussed crop.
@@ -287,13 +287,15 @@ class AgriAgentRouter:
             session.commodity = None
 
         # Update farmer identity if stated
+        is_name_question = any(w in raw_text.lower() for w in ["kya hai", "what is", "kaun hai", "who is", "batao", "bataiye", "pata hai", "tell me", "?"])
         extracted_name = parsed.get("farmer_name")
-        if not extracted_name:
+        if not is_name_question and not extracted_name:
             m_name = re.search(r"(?:my name is|mera naam|naam hai)\s+([a-zA-Z\u0900-\u097F]+)", raw_text, re.IGNORECASE)
             if m_name:
                 extracted_name = m_name.group(1).strip()
 
-        if extracted_name and extracted_name.lower() not in ["kisan", "bhai", "ji", "ai"]:
+        invalid_names = {"kya", "what", "kaun", "who", "hai", "or_null", "null", "none", "kisan", "bhai", "ji", "ai", "sir", "madam", "user", "farmer"}
+        if extracted_name and extracted_name.lower().strip() not in invalid_names and not is_name_question:
             session.farmer_name = extracted_name.capitalize()
             f_name = session.farmer_name
             if getattr(session, "phone_number", None):

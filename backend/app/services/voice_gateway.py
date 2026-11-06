@@ -145,18 +145,24 @@ class VoiceGatewaySession:
 
     async def handle_speech_end(self, data: Dict[str, Any]):
         """
-        Triggered when Client VAD detects 700ms silence after speech.
-        Receives recorded WAV audio, transcribes with Gnani Prisma STT,
+        Triggered when user clicks Done on the full-screen voice overlay.
+        Receives recorded WAV audio, cleans via Acoustic DSP, transcribes with Gnani Prisma STT,
         reasons through DialogueManager, and synthesizes reply with Gnani Timbre.
         """
         audio_b64 = data.get("audio_data", "")
+        # Update session language if provided in speech_end payload
+        if data.get("language"):
+            self.language = data["language"].strip()
+            dm_session = dialogue_manager.get_or_create_session(self.session_id)
+            dm_session.language = self.language
+
         self.active_turn_id += 1
         turn_id = self.active_turn_id
 
         await self.send_json({
             "type": "vad_state",
             "state": "processing",
-            "message": "Transcribing with Superpowered Whisper & Prisma..."
+            "message": "Transcribing with Gnani Prisma STT..."
         })
 
         transcript = ""
@@ -164,20 +170,18 @@ class VoiceGatewaySession:
             try:
                 audio_bytes = base64.b64decode(audio_b64)
                 if len(audio_bytes) > 300:
+                    cleaned_audio = acoustic_dsp.clean_audio_for_stt(audio_bytes)
                     transcript = await gnani_stt.transcribe_audio_chunk(
-                        audio_bytes,
+                        cleaned_audio,
                         language=self.language,
                         api_key=self.api_key or settings.GNANI_API_KEY
                     )
             except Exception as e:
                 print(f"[VoiceGateway:{self.session_id}] STT decoding error: {e}")
 
-        # Incorporate client real-time transcript (Web Speech API)
+        # Fallback to client text ONLY if audio STT produced zero transcript
         client_text = data.get("text", "").strip()
         if not transcript or not transcript.strip():
-            transcript = client_text
-        elif client_text and len(client_text.split()) > len(transcript.split()) + 2:
-            # Client transcript captured more complete phrasing
             transcript = client_text
 
         # If transcription is empty or silent, send clarification prompt
@@ -189,7 +193,7 @@ class VoiceGatewaySession:
             })
             return
 
-        print(f"[VoiceGateway:{self.session_id}] Transcribed Farmer Utterance: '{transcript}'")
+        print(f"[VoiceGateway:{self.session_id}] Transcribed Farmer Utterance (Gnani Prisma): '{transcript}'")
         await self._process_text_utterance(transcript, turn_id, is_stt=True)
 
     async def handle_user_text(self, data: Dict[str, Any]):

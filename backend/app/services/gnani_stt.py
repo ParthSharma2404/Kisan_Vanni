@@ -22,6 +22,56 @@ class SuperpoweredSTTService:
         self.api_url = settings.GNANI_STT_API_URL
         self.groq_api_key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY", "").strip()
 
+    def clean_hallucinations(self, text: str) -> str:
+        """
+        Strips common Whisper training dataset artifacts (YouTube end-screen subtitles).
+        When audio has low energy or trailing silence, Whisper often hallucinates phrases like
+        'Thank you for watching', 'Please like and subscribe', etc.
+        """
+        if not text:
+            return ""
+        
+        cleaned = text.strip()
+        
+        # Regex patterns matching trailing YouTube end-card hallucinations
+        hallucination_patterns = [
+            r"(?:thank\s+you\s+(?:very\s+much\s+)?(?:so\s+much\s+)?for\s+watching[.!?,]*\s*)+$",
+            r"(?:thanks\s+for\s+watching[.!?,]*\s*)+$",
+            r"(?:please\s+like\s+and\s+subscribe[.!?,]*\s*)+$",
+            r"(?:like\s+and\s+subscribe[.!?,]*\s*)+$",
+            r"(?:subscribe\s+to\s+(?:my\s+)?channel[.!?,]*\s*)+$",
+            r"(?:subtitles\s+by[^\n.]*[.!?,]*\s*)+$",
+            r"(?:translated\s+by[^\n.]*[.!?,]*\s*)+$",
+            r"(?:amara\.org[.!?,]*\s*)+$",
+        ]
+        for pat in hallucination_patterns:
+            cleaned = re.sub(pat, "", cleaned, flags=re.IGNORECASE).strip()
+            
+        lower_t = cleaned.lower().strip(" .!?,:;\"'()[]{}")
+        standalone_hallucinations = {
+            "thank you for watching",
+            "thanks for watching",
+            "thank you very much for watching",
+            "thank you so much for watching",
+            "thank you",
+            "thanks",
+            "thank you very much",
+            "please like and subscribe",
+            "like and subscribe",
+            "subscribe for more",
+            "subtitles by",
+            "translated by",
+            "amara.org",
+            "bye",
+            "bye bye",
+            "see you next time",
+            "you"
+        }
+        if lower_t in standalone_hallucinations:
+            return ""
+
+        return cleaned
+
     def _normalize_gnani_lang(self, lang: str) -> str:
         """
         Gnani Prisma v3 strictly accepts only these codes:
@@ -158,12 +208,12 @@ class SuperpoweredSTTService:
                 )
                 if res.status_code == 200:
                     text = res.json().get("text", "").strip()
-                    lower_text = text.lower().strip(" .!?,")
-                    if lower_text in ["thank you", "thanks", "bye", "you", "subtitles by", "amara.org", ""]:
+                    cleaned_hallucinations = self.clean_hallucinations(text)
+                    if not cleaned_hallucinations:
                         return ""
                     
                     # Run through Anti-Urdu Firewall
-                    clean_text = await self._sanitize_anti_urdu(text)
+                    clean_text = await self._sanitize_anti_urdu(cleaned_hallucinations)
                     print(f"[SuperSTT:Whisper] Detected: '{clean_text}' (forced_lang={w_lang})")
                     return clean_text
                 else:
@@ -200,7 +250,7 @@ class SuperpoweredSTTService:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=14.0, verify=False) as client:
                 res = await client.post(self.api_url, headers=headers, files=files, data=data)
                 if res.status_code == 200:
                     result = res.json()
@@ -223,29 +273,36 @@ class SuperpoweredSTTService:
         api_key: Optional[str] = None
     ) -> str:
         """
-        Concurrent Dual-Engine Ensemble:
-        Runs Whisper Large v3 and Gnani Prisma concurrently.
-        Guarantees zero Urdu text output and picks the most complete transcript.
+        Transcribes speech prioritizing Gnani Prisma STT v3 as the primary engine
+        to detect the exact Indic words spoken by the farmer.
+        Falls back to Groq Whisper Large v3 if Gnani Prisma produces no transcript.
         """
         if not audio_bytes or len(audio_bytes) < 300:
             return ""
 
+        # Launch Gnani Prisma (Primary) and Whisper (Fallback) concurrently
         tasks = [
-            self.transcribe_with_whisper(audio_bytes, language=language),
-            self.transcribe_with_gnani(audio_bytes, language=language, api_key=api_key)
+            self.transcribe_with_gnani(audio_bytes, language=language, api_key=api_key),
+            self.transcribe_with_whisper(audio_bytes, language=language)
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        whisper_text = results[0] if isinstance(results[0], str) else ""
-        gnani_text = results[1] if isinstance(results[1], str) else ""
+        gnani_text = results[0] if isinstance(results[0], str) else ""
+        whisper_text = results[1] if isinstance(results[1], str) else ""
 
-        # Priority 1: Whisper Large v3
-        if whisper_text and len(whisper_text.strip()) > 1:
-            return whisper_text.strip()
-
-        # Priority 2: Gnani Prisma v3
+        # Priority 1: Gnani Prisma STT v3 (Exact Sovereign Indic Model)
         if gnani_text and len(gnani_text.strip()) > 1:
-            return gnani_text.strip()
+            clean_g = self.clean_hallucinations(gnani_text.strip())
+            if clean_g:
+                print(f"[SuperSTT] Utilizing Gnani Prisma v3 transcript: '{clean_g}'")
+                return clean_g
+
+        # Priority 2: Whisper Large v3 Fallback
+        if whisper_text and len(whisper_text.strip()) > 1:
+            clean_w = self.clean_hallucinations(whisper_text.strip())
+            if clean_w:
+                print(f"[SuperSTT] Utilizing Whisper fallback transcript: '{clean_w}'")
+                return clean_w
 
         return ""
 

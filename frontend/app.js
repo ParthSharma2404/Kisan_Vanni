@@ -875,6 +875,10 @@ function openVoiceModal() {
   if (langLabel && LANGUAGE_LABELS) {
     langLabel.innerText = LANGUAGE_LABELS[currentLanguage] || "Hindi";
   }
+  const voiceBottomHint = document.getElementById("voiceBottomHint");
+  if (voiceBottomHint) {
+    voiceBottomHint.innerText = "Speak freely at your own pace • Tap Done when finished";
+  }
   if (!overlay) return;
   overlay.style.display = "flex";
   void overlay.offsetWidth; // Force layout reflow so initial state is rendered before .active is applied
@@ -1728,23 +1732,24 @@ function handleServerEvent(data) {
       return;
     }
 
-    // Check if card was already rendered
-    const aiRows = dynamicMessagesContainer ? Array.from(dynamicMessagesContainer.querySelectorAll(".ai-row")) : [];
-    let existingCard = null;
-    for (let i = aiRows.length - 1; i >= 0; i--) {
-      const p = aiRows[i].querySelector(".card-content");
-      if (p && text && (p.innerText.includes(text.slice(0, 30)) || text.includes(p.innerText.slice(0, 30)))) {
-        existingCard = aiRows[i];
-        break;
+    // Check if response was ALREADY rendered for the current turn (e.g. duplicate event delivery)
+    const allRows = dynamicMessagesContainer ? Array.from(dynamicMessagesContainer.children) : [];
+    const lastRow = allRows.length > 0 ? allRows[allRows.length - 1] : null;
+    const isAnsweringUserQuery = lastRow && lastRow.classList.contains("user-row");
+
+    let isDuplicate = false;
+    if (!isAnsweringUserQuery && lastRow && lastRow.classList.contains("ai-row")) {
+      const p = lastRow.querySelector(".card-content");
+      if (p && text && (p.innerText.trim() === text.trim() || p.innerText.includes(text.slice(0, 30)))) {
+        isDuplicate = true;
+        const audioBtn = lastRow.querySelector(".btn-card-audio");
+        if (audioBtn && data.audio_base64) {
+          audioBtn.setAttribute("data-audio", data.audio_base64);
+        }
       }
     }
 
-    if (existingCard) {
-      // Historical or pre-existing card: attach audio data for manual replay ONLY; NEVER auto-play
-      const audioBtn = existingCard.querySelector(".btn-card-audio");
-      if (audioBtn && data.audio_base64) {
-        audioBtn.setAttribute("data-audio", data.audio_base64);
-      }
+    if (isDuplicate) {
       setTurnState("ready");
       return;
     } else {
@@ -2006,29 +2011,20 @@ async function startMicrophoneRecording() {
       // Retain EVERY audio chunk from the exact moment recording starts! Zero missing starting words!
       audioBufferChunks.push(new Float32Array(inputData));
 
-      // RMS calculation for auto-stop on silence
+      // RMS calculation exclusively for real-time visualizer energy feedback
       let sum = 0;
       for (let i = 0; i < inputData.length; i++) {
         sum += inputData[i] * inputData[i];
       }
       const rms = Math.sqrt(sum / inputData.length);
-      const now = performance.now();
 
       // Real-time 3D voice orb reactive feedback (vocal energy modulation)
       VoiceOrbVisualizer.setVolume(rms);
 
-      // Soft threshold (0.005) ensures whispering or soft consonants are caught
+      // Track speech energy without any automatic silence cut-off.
+      // Farmer can speak and pause freely at their own pace until they tap Done.
       if (rms > 0.005) {
         isSpeaking = true;
-        silenceStartTime = 0;
-      } else {
-        if (isSpeaking) {
-          if (silenceStartTime === 0) silenceStartTime = now;
-          else if (now - silenceStartTime > 1800) { // 1.8s natural pause auto-submits input seamlessly
-            isSpeaking = false;
-            stopRecordingAndSend();
-          }
-        }
       }
     };
 
@@ -2095,7 +2091,8 @@ function stopRecordingAndSend() {
       socket.send(JSON.stringify({
         type: "speech_end",
         audio_data: base64Wav,
-        text: textToSend
+        text: textToSend,
+        language: currentLanguage
       }));
     }
   };
@@ -2250,12 +2247,18 @@ async function fetchChatFallback(text) {
       const data = await res.json();
       const spokenText = data.spoken_text || "";
       if (spokenText) {
-        // Prevent duplicate response card & dual audio if WebSocket already delivered
-        const aiRows = dynamicMessagesContainer ? Array.from(dynamicMessagesContainer.querySelectorAll(".ai-row")) : [];
-        const alreadyRendered = aiRows.some(row => {
-          const p = row.querySelector(".card-content");
-          return p && (p.innerText.includes(spokenText.slice(0, 30)) || spokenText.includes(p.innerText.slice(0, 30)));
-        });
+        // Prevent duplicate response card & dual audio if WebSocket already delivered for this turn
+        const allRows = dynamicMessagesContainer ? Array.from(dynamicMessagesContainer.children) : [];
+        const lastRow = allRows.length > 0 ? allRows[allRows.length - 1] : null;
+        const isAnsweringUserQuery = lastRow && lastRow.classList.contains("user-row");
+
+        let alreadyRendered = false;
+        if (!isAnsweringUserQuery && lastRow && lastRow.classList.contains("ai-row")) {
+          const p = lastRow.querySelector(".card-content");
+          if (p && (p.innerText.trim() === spokenText.trim() || p.innerText.includes(spokenText.slice(0, 30)) || spokenText.includes(p.innerText.slice(0, 30)))) {
+            alreadyRendered = true;
+          }
+        }
 
         if (!alreadyRendered) {
           SoundFX.playReceive();
@@ -2524,9 +2527,17 @@ document.addEventListener("DOMContentLoaded", () => {
       if (voiceModalLangLabel) voiceModalLangLabel.innerText = newLabel;
       const currentLangLabel = document.getElementById("currentLangLabel");
       if (currentLangLabel) currentLangLabel.innerText = newLabel;
+
+      // Dispatch set_language to backend WebSocket so Gnani Prisma STT receives exact target language
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+          type: "set_language",
+          language: currentLanguage
+        }));
+      }
       
       if (voiceBottomHint) {
-        voiceBottomHint.innerText = `Language set to ${newLabel} • Auto-submits on pause`;
+        voiceBottomHint.innerText = `Language: ${newLabel} • Tap Done when finished`;
       }
     });
   }

@@ -228,7 +228,11 @@ class LLMService:
             f"9. STRICT ARBITRAGE ALIGNMENT (TEXT-TO-CARD 100% FIDELITY):\n"
             f"   • When 'MATHEMATICAL ARBITRAGE WINNER (RANK #1)' is provided in the verified context data, your spoken advice MUST recommend that exact mandi as the primary option.\n"
             f"   • NEVER contradict the visual card or recommend a runner-up mandi as 'more cost-effective'. The arbitrage engine has ALREADY deducted exact travel fuel/freight, APMC cess, and hamali from each candidate.\n"
-            f"   • If comparing with a closer runner-up mandi, explain clearly and accurately that while the runner-up is closer, the higher modal price at the top-ranked mandi covers the travel fuel and still yields higher net in-hand profit."
+            f"   • If comparing with a closer runner-up mandi, explain clearly and accurately that while the runner-up is closer, the higher modal price at the top-ranked mandi covers the travel fuel and still yields higher net in-hand profit.\n\n"
+            f"10. FARMER IDENTITY & NAME INQUIRIES:\n"
+            f"    • If the user asks what their name is (e.g. 'mera naam kya hai', 'what is my name'):\n"
+            f"    • If their name is '{f_name}' and '{f_name}' is 'Kisan Bhai' or generic, tell them warmly in their language that they haven't introduced themselves or shared their name yet, and ask what they would like you to call them.\n"
+            f"    • If their specific real name has already been provided (e.g. Ramesh, Parth), confirm their name respectfully."
         )
 
     async def generate_response(
