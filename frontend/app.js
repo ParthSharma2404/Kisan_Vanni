@@ -2336,6 +2336,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Backdrop click dismiss for mobile & desktop
+  if (weatherAgronomyModal) {
+    weatherAgronomyModal.addEventListener("click", (e) => {
+      if (e.target === weatherAgronomyModal) {
+        weatherAgronomyModal.style.display = "none";
+      }
+    });
+  }
+
+  // Escape key dismiss
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && weatherAgronomyModal && weatherAgronomyModal.style.display === "flex") {
+      weatherAgronomyModal.style.display = "none";
+    }
+  });
+
   // Multimodal Leaf Photo Upload Trigger
   if (btnUploadLeaf && leafFileInput) {
     btnUploadLeaf.addEventListener("click", () => {

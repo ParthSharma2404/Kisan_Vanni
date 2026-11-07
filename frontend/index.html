@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=52">
+  <link rel="stylesheet" href="style.css?v=53">
 </head>
 <body class="ai-buddy-body">
   <!-- Faint topographic background contours -->
@@ -360,6 +360,7 @@
   <!-- Hyperlocal Weather & Comprehensive Agronomy Intelligence Drawer -->
   <div class="weather-modal-overlay" id="weatherAgronomyModal" style="display: none;">
     <div class="weather-modal-card">
+      <div class="weather-sheet-handle"></div>
       <div class="weather-modal-header">
         <div class="weather-header-title">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -378,7 +379,7 @@
             <span class="weather-loc-sub" id="weatherLocSub">Live Open-Meteo GPS Sensor Feed</span>
           </div>
         </div>
-        <button class="weather-close-btn" id="weatherCloseBtn">&times;</button>
+        <button class="weather-close-btn" id="weatherCloseBtn" aria-label="Close Weather Intelligence">&times;</button>
       </div>
 
       <div class="weather-hero-row" id="weatherHeroMetrics">
@@ -411,6 +412,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=52"></script>
+  <script src="app.js?v=53"></script>
 </body>
 </html>
